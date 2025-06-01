@@ -19,13 +19,7 @@
     Home: https://github.com/gorhill/uBlock
 */
 
-/* jshint esversion:11 */
-
-'use strict';
-
 // ruleset: $rulesetId$
-
-/******************************************************************************/
 
 // Important!
 // Isolate from global scope
@@ -34,15 +28,12 @@
 /******************************************************************************/
 
 const argsList = self.$argsList$;
-
+const argsSeqs = self.$argsSeqs$;
 const hostnamesMap = new Map(self.$hostnamesMap$);
-
-const entitiesMap = new Map(self.$entitiesMap$);
-
-const exceptionsMap = new Map(self.$exceptionsMap$);
+const hasEntities = self.$hasEntities$;
 
 self.declarativeImports = self.declarativeImports || [];
-self.declarativeImports.push({ argsList, hostnamesMap, entitiesMap, exceptionsMap });
+self.declarativeImports.push({ argsList, argsSeqs, hostnamesMap, hasEntities });
 
 /******************************************************************************/
 

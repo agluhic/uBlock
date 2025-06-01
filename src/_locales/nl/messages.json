@@ -900,11 +900,11 @@
     "description": "Text for button which open an external webpage in Support pane"
   },
   "supportReportSpecificButton": {
-    "message": "Nieuwe melding maken",
+    "message": "Nieuwe melding op GitHub maken",
     "description": "Text for button which open an external webpage in Support pane"
   },
   "supportFindSpecificButton": {
-    "message": "Soortgelijke meldingen zoeken",
+    "message": "Soortgelijke meldingen op GitHub zoeken",
     "description": "A clickable link in the filter issue reporter section"
   },
   "supportS1H": {
@@ -1009,6 +1009,10 @@
   },
   "supportS6Select1Option6": {
     "message": "Opent ongewenste tabbladen of vensters",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option7": {
+    "message": "Leidt tot badware, phishing",
     "description": "An entry in the widget used to select the type of issue"
   },
   "supportS6Checkbox1": {
@@ -1186,6 +1190,10 @@
   "docblockedDisable": {
     "message": "Doorgaan",
     "description": "Button text to navigate to the blocked page"
+  },
+  "docblockedRedirectPrompt": {
+    "message": "De geblokkeerde pagina wil u omleiden naar een andere website. Als u doorgaat, navigeert u rechtstreeks naar: {{url}}",
+    "description": "Text warning about an incoming redirect"
   },
   "cloudPush": {
     "message": "Exporteren naar cloudopslag",

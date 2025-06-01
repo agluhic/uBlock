@@ -17,10 +17,10 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "uBlock0@raymondhill.net",
-      "strict_min_version": "78.0"
+      "strict_min_version": "92.0"
     },
     "gecko_android": {
-      "strict_min_version": "79.0"
+      "strict_min_version": "92.0"
     }
   },
   "commands": {
@@ -99,7 +99,8 @@
     "32": "img/ublock.svg",
     "48": "img/ublock.svg",
     "64": "img/ublock.svg",
-    "96": "img/ublock.svg"
+    "96": "img/ublock.svg",
+    "128": "img/ublock.svg"
   },
   "manifest_version": 2,
   "name": "uBlock Origin",

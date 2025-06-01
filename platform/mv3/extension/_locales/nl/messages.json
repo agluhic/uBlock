@@ -4,7 +4,7 @@
     "description": "extension name."
   },
   "extShortDesc": {
-    "message": "Een toestemmingsloze inhoudsblokkeerder. Blokkeert direct na installatie advertenties, trackers, miners en meer.",
+    "message": "Een efficiënte inhoudsblokkeerder. Blokkeert direct na installatie advertenties, trackers, miners en meer.",
     "description": "this will be in the Chrome web store: must be 132 characters or less"
   },
   "perRulesetStats": {
@@ -19,6 +19,10 @@
     "message": "Instellingen",
     "description": "appears as tab name in dashboard"
   },
+  "developPageName": {
+    "message": "Ontwikkelen",
+    "description": "appears as tab name in dashboard. Inspired from 'Develop' menu in Safari, see https://developer.apple.com/documentation/safari-developer-tools/develop-menu"
+  },
   "aboutPageName": {
     "message": "Over",
     "description": "appears as tab name in dashboard"
@@ -30,6 +34,10 @@
   "popupFilteringModeLabel": {
     "message": "filtermodus",
     "description": "Label in the popup panel for the current filtering mode"
+  },
+  "popupTipReport": {
+    "message": "Een probleem op deze website melden",
+    "description": "Tooltip used for the 'chat' icon in the panel"
   },
   "popupTipDashboard": {
     "message": "Dashboard openen",
@@ -99,13 +107,73 @@
     "message": "Externe afhankelijkheden (GPLv3-compatibel):",
     "description": "Shown in the About pane"
   },
-  "firstRunSectionLabel": {
-    "message": "Welkom",
-    "description": "The header text for the welcome message section"
+  "supportS6H": {
+    "message": "Een filterprobleem melden",
+    "description": "Header of 'Report a filter issue' section in Support pane"
   },
-  "firstRunDescription": {
-    "message": "U hebt zojuist uBO Lite geïnstalleerd. Hier kunt u de standaard filtermodus voor het gebruik op alle websites kiezen.\n\nStandaard wordt de modus <em>Basis</em> geselecteerd, omdat hiervoor geen toestemming voor het lezen en aanpassen van gegevens is vereist. Als u uBO Lite vertrouwt, kunt u het brede toestemming voor het lezen en aanpassen van gegevens op alle websites verlenen, zodat standaard meer geavanceerde filtermogelijkheden voor alle websites beschikbaar zijn.",
-    "description": "Descriptive text shown at first install time only "
+  "supportS3P1": {
+    "message": "Meld filterproblemen met specifieke websites in de <span data-url=\"https://github.com/uBlockOrigin/uAssets/issues?q=is%3Aissue\"><code>uBlockOrigin/uAssets</code>-probleemtracker</span>. <u>Vereist een GitHub-account.</u>",
+    "description": "First paragraph of 'Filter issues' section in Support pane"
+  },
+  "supportS5H": {
+    "message": "Probleemoplossingsinformatie",
+    "description": "Label of 'Troubleshooting information' section in 'Report a filter issue' page"
+  },
+  "supportS6P1S1": {
+    "message": "Controleer of het probleem niet eerder is gemeld om te voorkomen dat vrijwilligers met dubbele meldingen worden belast. <b>Noot:</b> op de knop klikken zorgt ervoor dat de oorsprong van de pagina naar GitHub wordt verzonden.",
+    "description": "A paragraph in the filter issue reporter section"
+  },
+  "supportFindSpecificButton": {
+    "message": "Soortgelijke meldingen op GitHub zoeken",
+    "description": "A clickable link in the filter issue reporter section"
+  },
+  "supportS6URL": {
+    "message": "Adres van de webpagina:",
+    "description": "Label for the URL of the page"
+  },
+  "supportS6Select1": {
+    "message": "De webpagina…",
+    "description": "Label for widget to select type of issue"
+  },
+  "supportS6Select1Option0": {
+    "message": "-- Maak een keuze --",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option1": {
+    "message": "Toont advertenties of restanten",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option2": {
+    "message": "Heeft overlappingen of andere ongemakken",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option3": {
+    "message": "Detecteert uBO Lite",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option4": {
+    "message": "Heeft privacy-gerelateerde problemen",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option5": {
+    "message": "Werkt niet als uBO Lite is ingeschakeld",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option6": {
+    "message": "Opent ongewenste tabbladen of vensters",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option7": {
+    "message": "Leidt tot badware, phishing",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Checkbox1": {
+    "message": "De webpagina labelen als ‘NSFW’ (<a href=\"https://wikipedia.org/wiki/Not_safe_for_work\">‘Not Safe For Work’</a>)",
+    "description": "A checkbox to use for NSFW sites"
+  },
+  "supportReportSpecificButton": {
+    "message": "Nieuwe melding op GitHub maken",
+    "description": "Text for button which open an external webpage in Support pane"
   },
   "defaultFilteringModeSectionLabel": {
     "message": "Standaard filtermodus",
@@ -147,6 +215,10 @@
     "message": "Lijst van hostnamen waarvoor geen filtering plaatsvindt.",
     "description": "A short description for the editable field which lists trusted sites"
   },
+  "noFilteringModePlaceholder": {
+    "message": "[alleen hostnamen]\nexample.com\ngames.example\n...",
+    "description": "Default text for in edit field"
+  },
   "behaviorSectionLabel": {
     "message": "Gedrag",
     "description": "The header text for the 'Behavior' section"
@@ -158,5 +230,93 @@
   "showBlockedCountLabel": {
     "message": "Het aantal geblokkeerde aanvragen op het werkbalkpictogram tonen",
     "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLabel": {
+    "message": "Strenge blokkering inschakelen",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLegend": {
+    "message": "Navigatie naar mogelijk ongewenste websites wordt geblokkeerd, en u krijgt de mogelijkheid om door te gaan.",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "developerModeLabel": {
+    "message": "Ontwikkelaarsmodus",
+    "description": "Label for a checkbox in the options page"
+  },
+  "developerModeLegend": {
+    "message": "Schakelt toegang tot voor technische gebruikers geschikte functies in.",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "findListsPlaceholder": {
+    "message": "Lijsten zoeken",
+    "description": "Placeholder for the input field used to find lists"
+  },
+  "strictblockTitle": {
+    "message": "Pagina geblokkeerd",
+    "description": "Webpage title for the strict-blocked page"
+  },
+  "strictblockSentence1": {
+    "message": "uBO Lite heeft het laden van de volgende pagina voorkomen:",
+    "description": "Sentence used in the strict-blocked page"
+  },
+  "strictblockReasonSentence1": {
+    "message": "De pagina is geblokkeerd vanwege een overeenkomend filter in {{listname}}.",
+    "description": "Text informing about what is causing the page to be blocked"
+  },
+  "strictblockRedirectSentence1": {
+    "message": "De geblokkeerde pagina wil u omleiden naar een andere website. Als u doorgaat, navigeert u rechtstreeks naar: {{url}}",
+    "description": "Text warning about an incoming redirect"
+  },
+  "strictblockNoParamsPrompt": {
+    "message": "zonder parameters",
+    "description": "Label to be used for the parameter-less URL"
+  },
+  "strictblockBack": {
+    "message": "Teruggaan",
+    "description": "A button to go back to the previous webpage"
+  },
+  "strictblockClose": {
+    "message": "Dit venster sluiten",
+    "description": "A button to close the current tab"
+  },
+  "strictblockDontWarn": {
+    "message": "Mij niet meer waarschuwen over deze website",
+    "description": "Label for checkbox in document-blocked page"
+  },
+  "strictblockProceed": {
+    "message": "Doorgaan",
+    "description": "A button to navigate to the blocked page"
+  },
+  "zapperTipEnter": {
+    "message": "Element­wisser­modus openen",
+    "description": "Tooltip for the button used to enter zapper mode"
+  },
+  "zapperTipQuit": {
+    "message": "Element­wisser­modus sluiten",
+    "description": "Tooltip for the button used to exit zapper mode"
+  },
+  "saveButton": {
+    "message": "Opslaan",
+    "description": "Text for buttons used to save changes"
+  },
+  "revertButton": {
+    "message": "Ongedaan maken",
+    "description": "Text for buttons used to revert changes"
+  },
+  "importAndAppendButton": {
+    "message": "Importeren en toevoegen…",
+    "description": "Text for buttons used to import and append content"
+  },
+  "exportButton": {
+    "message": "Exporteren…",
+    "description": "Text for buttons used to export content"
+  },
+  "dnrRulesSummary": {
+    "message": "Voer hieronder uw eigen DNR-regels in. <b>Voeg geen inhoud van niet-vertrouwde bronnen toe.</b>",
+    "description": "Short description of the DNR rules editor pane"
+  },
+  "dnrRulesCountInfo": {
+    "message": "Aantal geregistreerde regels: {count}",
+    "description": "Short sentence to report the number of currently registered DNR rules"
   }
 }

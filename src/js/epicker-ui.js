@@ -331,7 +331,7 @@ const onSvgClicked = function(ev) {
             mx: ev.clientX,
             my: ev.clientY,
             options: {
-                stay: ev.shiftKey || ev.type === 'touch',
+                stay: true,
                 highlight: ev.target !== svgIslands,
             },
         });
@@ -386,7 +386,7 @@ const onSvgTouch = (( ) => {
         const stopY = ev.changedTouches[0].screenY;
         const angle = Math.abs(Math.atan2(stopY - startY, stopX - startX));
         const distance = Math.sqrt(
-            Math.pow(stopX - startX, 2),
+            Math.pow(stopX - startX, 2) +
             Math.pow(stopY - startY, 2)
         );
         // Interpret touch events as a tap if:
@@ -822,6 +822,8 @@ const startPicker = function() {
 
     unpausePicker();
 
+    $id('quit').addEventListener('click', onQuitClicked);
+
     if ( pickerRoot.classList.contains('zap') ) { return; }
 
     cmEditor.on('changes', onCandidateChanged);
@@ -837,7 +839,6 @@ const startPicker = function() {
             dom.cl.toggle(pickerRoot, 'minimized');
         }
     });
-    $id('quit').addEventListener('click', onQuitClicked);
     $id('move').addEventListener('mousedown', onStartMoving);
     $id('move').addEventListener('touchstart', onStartMoving);
     $id('candidateFilters').addEventListener('click', onCandidateClicked);

@@ -1,12 +1,22 @@
 # https://stackoverflow.com/a/6273809
 run_options := $(filter-out $@,$(MAKECMDGOALS))
 
-.PHONY: all clean cleanassets test lint chromium opera firefox npm dig mv3 mv3-quick \
+.PHONY: all clean cleanassets test lint chromium opera firefox npm dig \
+	mv3-chromium mv3-firefox mv3-edge mv3-safari ubol-codemirror \
 	compare maxcost medcost mincost modifiers record wasm
 
-sources := $(wildcard assets/* assets/*/* dist/version src/* src/*/* src/*/*/* src/*/*/*/*)
-platform := $(wildcard platform/* platform/*/* platform/*/*/* platform/*/*/*/* platform/*/*/*/*/*)
+sources := ./dist/version $(shell find ./assets -type f) $(shell find ./src -type f)
+platform := $(wildcard platform/*/*)
 assets := dist/build/uAssets
+mv3-sources := \
+	$(shell find ./src -type f) \
+	$(wildcard platform/mv3/*) \
+	$(shell find ./platform/mv3/extension -name codemirror-ubol -prune -o -type f) \
+	platform/mv3/extension/lib/codemirror/codemirror-ubol/dist/cm6.bundle.ubol.min.js
+mv3-data := $(shell find ./dist/build/mv3-data -type f)
+
+mv3-edge-deps := $(wildcard platform/mv3/edge/*)
+mv3-safari-deps := $(wildcard platform/mv3/safari/*)
 
 all: chromium firefox npm
 
@@ -31,11 +41,16 @@ firefox: dist/build/uBlock0.firefox
 dist/build/uBlock0.npm: tools/make-nodejs.sh $(sources) $(platform) $(assets)
 	tools/make-npm.sh
 
-# Build the Node.js package.
 npm: dist/build/uBlock0.npm
 
-lint: npm
-	cd dist/build/uBlock0.npm && npm run lint
+# Dev tools
+node_modules:
+	npm install
+
+init: node_modules
+
+lint: init
+	npm run lint
 
 test: npm
 	cd dist/build/uBlock0.npm && npm run test
@@ -55,23 +70,37 @@ dig: dist/build/uBlock0.dig
 dig-snfe: dig
 	cd dist/build/uBlock0.dig && npm run snfe $(run_options)
 
-mv3-chromium: tools/make-mv3.sh $(sources) $(platform)
+dist/build/mv3-data:
+	mkdir -p dist/build/mv3-data
+
+ubol-codemirror:
+	$(MAKE) -sC platform/mv3/extension/lib/codemirror/codemirror-ubol/ ubol.bundle
+
+dist/build/uBOLite.chromium: tools/make-mv3.sh $(mv3-sources) $(platform) $(mv3-data) dist/build/mv3-data
 	tools/make-mv3.sh chromium
 
-mv3-firefox: tools/make-mv3.sh $(sources) $(platform)
+mv3-chromium: ubol-codemirror dist/build/uBOLite.chromium
+
+dist/build/uBOLite.firefox: tools/make-mv3.sh $(mv3-sources) $(platform) $(mv3-data) dist/build/mv3-data
 	tools/make-mv3.sh firefox
 
-mv3-quick: tools/make-mv3.sh $(sources) $(platform)
-	tools/make-mv3.sh quick
+mv3-firefox: ubol-codemirror dist/build/uBOLite.firefox
 
-mv3-full: tools/make-mv3.sh $(sources) $(platform)
-	tools/make-mv3.sh full
+dist/build/uBOLite.edge: tools/make-mv3.sh $(mv3-sources) $(mv3-edge-deps) $(mv3-data) dist/build/mv3-data
+	tools/make-mv3.sh edge
+
+mv3-edge: ubol-codemirror dist/build/uBOLite.edge
+
+dist/build/uBOLite.safari: tools/make-mv3.sh $(mv3-sources) $(mv3-safari-deps) $(mv3-data) dist/build/mv3-data
+	tools/make-mv3.sh safari
+
+mv3-safari: ubol-codemirror dist/build/uBOLite.safari
 
 dist/build/uAssets:
 	tools/pull-assets.sh
 
 clean:
-	rm -rf dist/build tmp/node_modules
+	rm -rf dist/build tmp/node_modules node_modules
 
 cleanassets:
 	rm -rf dist/build/mv3-data dist/build/uAssets

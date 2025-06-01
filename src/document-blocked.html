@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1 user-scalable=yes">
+<meta name="color-scheme" content="light dark" />
 <title data-i18n="docblockedTitle"></title>
 <link rel="stylesheet" href="css/themes/default.css">
 <link rel="stylesheet" href="css/common.css">
 <link rel="stylesheet" href="css/fa-icons.css">
 <link rel="stylesheet" href="css/document-blocked.css">
-<link rel="shortcut icon" type="image/png" href="img/icon_64.png">
+<link rel="icon" type="image/png" href="img/icon_64.png">
 </head>
 <body>
 <div id="rootContainer">
@@ -33,6 +34,9 @@
         </div>
     </div>
 
+    <div id="urlskip" hidden>
+    </div>
+
     <div class="li">
         <label><span class="input checkbox"><input type="checkbox" id="disableWarning"><svg viewBox="0 0 24 24"><path d="M1.73,12.91 8.1,19.28 22.79,4.59"/></svg></span><span data-i18n="docblockedDontWarn">_</span></label>
     </div>
@@ -42,13 +46,14 @@
         <button id="bye" data-i18n="docblockedClose" type="button">_<span class="hover"></span></button>
         <button id="proceed" class="preferred" data-i18n="docblockedDisable" type="button"><span class="hover"></span></button>
     </div>
-
-    <div id="templates" style="display: none;">
-        <li class="filterList">
-            <a class="filterListSource" href="asset-viewer.html?url=" target="_blank"></a>&nbsp;<!--
-         --><a class="fa-icon filterListSupport hidden" href="#" target="_blank" rel="noopener noreferrer">home</a>
-        </span>
-    </div>
+</div>
+<div id="templates" style="display: none;">
+    <ul>
+    <li class="filterList">
+        <a class="filterListSource" href="asset-viewer.html?url=" target="_blank"></a>&nbsp;<!--
+     --><a class="fa-icon filterListSupport hidden" href="#" target="_blank" rel="noopener noreferrer">home</a>
+    </li>
+    </ul>
 </div>
 
 <script src="lib/hsluv/hsluv-0.1.0.min.js"></script>

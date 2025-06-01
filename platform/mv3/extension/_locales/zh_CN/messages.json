@@ -19,6 +19,10 @@
     "message": "设置",
     "description": "appears as tab name in dashboard"
   },
+  "developPageName": {
+    "message": "Develop",
+    "description": "appears as tab name in dashboard. Inspired from 'Develop' menu in Safari, see https://developer.apple.com/documentation/safari-developer-tools/develop-menu"
+  },
   "aboutPageName": {
     "message": "关于",
     "description": "appears as tab name in dashboard"
@@ -31,8 +35,12 @@
     "message": "过滤模式",
     "description": "Label in the popup panel for the current filtering mode"
   },
+  "popupTipReport": {
+    "message": "报告此网站上的问题",
+    "description": "Tooltip used for the 'chat' icon in the panel"
+  },
   "popupTipDashboard": {
-    "message": "在仪表板中",
+    "message": "打开控制面板",
     "description": "English: Click to open the dashboard"
   },
   "popupMoreButton": {
@@ -44,7 +52,7 @@
     "description": "Label to be used to hide popup panel sections"
   },
   "3pGroupDefault": {
-    "message": "预设",
+    "message": "默认",
     "description": "Header for a ruleset section in 'Filter lists pane'"
   },
   "3pGroupAds": {
@@ -99,13 +107,73 @@
     "message": "外部依赖（与 GPLv3 协议兼容）：",
     "description": "Shown in the About pane"
   },
-  "firstRunSectionLabel": {
-    "message": "欢迎使用",
-    "description": "The header text for the welcome message section"
+  "supportS6H": {
+    "message": "报告过滤问题",
+    "description": "Header of 'Report a filter issue' section in Support pane"
   },
-  "firstRunDescription": {
-    "message": "uBO Lite 现已安装完毕。接下来您可以为网页内容选择默认过滤模式。\n\n预设过滤模式为“基础”，该模式不需要读取或修改网页内容的权限。如果您信任 uBO Lite，您可以授予其用以读取或修改所有网页数据的额外权限，进而默认为所有网站开启高级过滤模式。",
-    "description": "Descriptive text shown at first install time only "
+  "supportS3P1": {
+    "message": "将特定网站的过滤问题报告给<span data-url=\"https://github.com/uBlockOrigin/uAssets/issues?q=is%3Aissue\"><code>uBlockOrigin/uAssets</code> issue tracker</span>。<u>需要有 GitHub 账户。</u>",
+    "description": "First paragraph of 'Filter issues' section in Support pane"
+  },
+  "supportS5H": {
+    "message": "故障排查相关信息",
+    "description": "Label of 'Troubleshooting information' section in 'Report a filter issue' page"
+  },
+  "supportS6P1S1": {
+    "message": "请确认该问题未曾上报，以避免加重志愿者负担。",
+    "description": "A paragraph in the filter issue reporter section"
+  },
+  "supportFindSpecificButton": {
+    "message": "找到相似报告",
+    "description": "A clickable link in the filter issue reporter section"
+  },
+  "supportS6URL": {
+    "message": "网页地址：",
+    "description": "Label for the URL of the page"
+  },
+  "supportS6Select1": {
+    "message": "网页...",
+    "description": "Label for widget to select type of issue"
+  },
+  "supportS6Select1Option0": {
+    "message": "-- 选择一个条目 --",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option1": {
+    "message": "显示广告或残留广告",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option2": {
+    "message": "存在遮盖或类似问题",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option3": {
+    "message": "检测 uBO Lite",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option4": {
+    "message": "存在隐私相关问题",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option5": {
+    "message": "启用 uBO Lite 时发生故障",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option6": {
+    "message": "打开了不想要的标签页或窗口",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option7": {
+    "message": "导致恶意软件、网络钓鱼",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Checkbox1": {
+    "message": "将网页标记为 “NSFW”（<a href=“https://zh.wikipedia.org/zh-hans/NSFW>“工作场所不宜”</a>）",
+    "description": "A checkbox to use for NSFW sites"
+  },
+  "supportReportSpecificButton": {
+    "message": "创建新报告",
+    "description": "Text for button which open an external webpage in Support pane"
   },
   "defaultFilteringModeSectionLabel": {
     "message": "默认过滤模式",
@@ -144,11 +212,15 @@
     "description": "This describes the 'complete' filtering mode"
   },
   "noFilteringModeDescription": {
-    "message": "不进行过滤的主机名列表",
+    "message": "不进行过滤的网站列表。",
     "description": "A short description for the editable field which lists trusted sites"
   },
+  "noFilteringModePlaceholder": {
+    "message": "[仅限主机名]\nexample.com\ngames.example\n...",
+    "description": "Default text for in edit field"
+  },
   "behaviorSectionLabel": {
-    "message": "操作设置",
+    "message": "行为",
     "description": "The header text for the 'Behavior' section"
   },
   "autoReloadLabel": {
@@ -156,7 +228,95 @@
     "description": "Label for a checkbox in the options page"
   },
   "showBlockedCountLabel": {
-    "message": "在工具栏图标上显示已拦截的请求数",
+    "message": "在工具栏图标上显示拦截请求数",
     "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLabel": {
+    "message": "开启严格拦截",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLegend": {
+    "message": "导航至潜在不良网站的操作将被拦截，并且您将可以选择继续前往。",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "developerModeLabel": {
+    "message": "Developer mode",
+    "description": "Label for a checkbox in the options page"
+  },
+  "developerModeLegend": {
+    "message": "Enables access to features suitable for technical users.",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "findListsPlaceholder": {
+    "message": "查找列表",
+    "description": "Placeholder for the input field used to find lists"
+  },
+  "strictblockTitle": {
+    "message": "被拦截的页面",
+    "description": "Webpage title for the strict-blocked page"
+  },
+  "strictblockSentence1": {
+    "message": "uBO Lite 已阻止加载以下页面：",
+    "description": "Sentence used in the strict-blocked page"
+  },
+  "strictblockReasonSentence1": {
+    "message": "该页面由于 {{listName}} 中的匹配过滤器而被阻止。",
+    "description": "Text informing about what is causing the page to be blocked"
+  },
+  "strictblockRedirectSentence1": {
+    "message": "被拦截的页面将重定向至其他网站。如果您选择继续，将直接导航至：{{url}}",
+    "description": "Text warning about an incoming redirect"
+  },
+  "strictblockNoParamsPrompt": {
+    "message": "不含参数",
+    "description": "Label to be used for the parameter-less URL"
+  },
+  "strictblockBack": {
+    "message": "返回",
+    "description": "A button to go back to the previous webpage"
+  },
+  "strictblockClose": {
+    "message": "关闭此窗口",
+    "description": "A button to close the current tab"
+  },
+  "strictblockDontWarn": {
+    "message": "不要再警告我有关此网站",
+    "description": "Label for checkbox in document-blocked page"
+  },
+  "strictblockProceed": {
+    "message": "继续",
+    "description": "A button to navigate to the blocked page"
+  },
+  "zapperTipEnter": {
+    "message": "进入临时移除元素模式",
+    "description": "Tooltip for the button used to enter zapper mode"
+  },
+  "zapperTipQuit": {
+    "message": "退出临时元素移除模式",
+    "description": "Tooltip for the button used to exit zapper mode"
+  },
+  "saveButton": {
+    "message": "Save",
+    "description": "Text for buttons used to save changes"
+  },
+  "revertButton": {
+    "message": "Revert",
+    "description": "Text for buttons used to revert changes"
+  },
+  "importAndAppendButton": {
+    "message": "Import and append…",
+    "description": "Text for buttons used to import and append content"
+  },
+  "exportButton": {
+    "message": "Export…",
+    "description": "Text for buttons used to export content"
+  },
+  "dnrRulesSummary": {
+    "message": "Enter your own DNR rules below. <b>Do not add content from untrusted sources.</b>",
+    "description": "Short description of the DNR rules editor pane"
+  },
+  "dnrRulesCountInfo": {
+    "message": "Number of registered rules: {count}",
+    "description": "Short sentence to report the number of currently registered DNR rules"
   }
 }

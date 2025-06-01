@@ -53,26 +53,27 @@ const hiddenSettingsDefault = {
     cacheStorageCompression: true,
     cacheStorageCompressionThreshold: 65536,
     cacheStorageMultithread: 2,
-    cacheControlForFirefox1376932: 'no-cache, no-store, must-revalidate',
+    cacheControlForFirefox1376932: 'unset',
     cloudStorageCompression: true,
     cnameIgnoreList: 'unset',
     cnameIgnore1stParty: true,
     cnameIgnoreExceptions: true,
     cnameIgnoreRootDocument: true,
-    cnameMaxTTL: 120,
     cnameReplayFullURL: false,
-    cnameUncloakProxied: false,
     consoleLogLevel: 'unset',
     debugAssetsJson: false,
     debugScriptlets: false,
     debugScriptletInjector: false,
     differentialUpdate: true,
     disableWebAssembly: false,
+    dnsCacheTTL: 600,
+    dnsResolveEnabled: true,
     extensionUpdateForceReload: false,
     filterAuthorMode: false,
     loggerPopupType: 'popup',
     manualUpdateAssetFetchPeriod: 500,
     modifyWebextFlavor: 'unset',
+    noScriptingCSP: 'script-src http: https:',
     popupFontSize: 'unset',
     popupPanelDisabledSections: 0,
     popupPanelHeightMode: 0,
@@ -179,8 +180,8 @@ const µBlock = {  // jshint ignore:line
 
     // Read-only
     systemSettings: {
-        compiledMagic: 57,  // Increase when compiled format changes
-        selfieMagic: 58,    // Increase when selfie format changes
+        compiledMagic: 60,  // Increase when compiled format changes
+        selfieMagic: 60,    // Increase when selfie format changes
     },
 
     // https://github.com/uBlockOrigin/uBlock-issues/issues/759#issuecomment-546654501
@@ -254,7 +255,6 @@ const µBlock = {  // jshint ignore:line
     scriptlets: {},
 
     cspNoInlineScript: "script-src 'unsafe-eval' * blob: data:",
-    cspNoScripting: 'script-src http: https:',
     cspNoInlineFont: 'font-src *',
 
     liveBlockingProfiles: [],
@@ -306,6 +306,7 @@ const µBlock = {  // jshint ignore:line
         this.realm = '';
         this.setMethod(details.method);
         this.setURL(details.url);
+        this.setIPAddress(details.ip);
         this.aliasURL = details.aliasURL || undefined;
         this.redirectURL = undefined;
         this.filter = undefined;
@@ -346,7 +347,7 @@ const µBlock = {  // jshint ignore:line
             this.setDocOrigin(origin).setTabOrigin(origin);
             return this;
         }
-        const origin = (this.itype & this.FRAME_ANY) !== 0
+        const origin = this.isDocument()
             ? originFromURI(this.url)
             : this.tabOrigin;
         this.setDocOrigin(origin).setTabOrigin(origin);

@@ -19,12 +19,6 @@
     Home: https://github.com/gorhill/uBlock
 */
 
-'use strict';
-
-/******************************************************************************/
-
-import staticNetFilteringEngine from './static-net-filtering.js';
-import { LineIterator } from './text-utils.js';
 import * as sfp from './static-filtering-parser.js';
 
 import {
@@ -32,20 +26,12 @@ import {
     CompiledListWriter,
 } from './static-filtering-io.js';
 
+import { LineIterator } from './text-utils.js';
+import staticNetFilteringEngine from './static-net-filtering.js';
+
 /******************************************************************************/
 
-// http://www.cse.yorku.ca/~oz/hash.html#djb2
-//   Must mirror content script surveyor's version
-
-const hashFromStr = (type, s) => {
-    const len = s.length;
-    const step = len + 7 >>> 3;
-    let hash = (type << 5) + type ^ len;
-    for ( let i = 0; i < len; i += step ) {
-        hash = (hash << 5) + hash ^ s.charCodeAt(i);
-    }
-    return hash & 0xFFFFFF;
-};
+const isRegexOrPath = hn => hn.includes('/');
 
 /******************************************************************************/
 
@@ -53,7 +39,7 @@ const hashFromStr = (type, s) => {
 // dependencies
 
 const rePlainSelector = /^[#.][\w\\-]+/;
-const rePlainSelectorEx = /^[^#.\[(]+([#.][\w-]+)|([#.][\w-]+)$/;
+const rePlainSelectorEx = /^[^#.[(]+([#.][\w-]+)|([#.][\w-]+)$/;
 const rePlainSelectorEscaped = /^[#.](?:\\[0-9A-Fa-f]+ |\\.|\w|-)+/;
 const reEscapeSequence = /\\([0-9A-Fa-f]+ |.)/g;
 
@@ -91,6 +77,26 @@ const keyFromSelector = selector => {
 
 /******************************************************************************/
 
+function addGenericCosmeticFilter(context, selector, isException) {
+    if ( selector === undefined ) { return; }
+    if ( selector.length <= 1 ) { return; }
+    if ( selector.charCodeAt(0) === 0x7B /* '{' */ ) { return; }
+    const key = keyFromSelector(selector);
+    if ( isException ) {
+        if ( context.genericCosmeticExceptions === undefined ) {
+            context.genericCosmeticExceptions = [];
+        }
+        context.genericCosmeticExceptions.push({ key, selector });
+        return;
+    }
+    if ( context.genericCosmeticFilters === undefined ) {
+        context.genericCosmeticFilters = [];
+    }
+    context.genericCosmeticFilters.push({ key, selector });
+}
+
+/******************************************************************************/
+
 function addExtendedToDNR(context, parser) {
     if ( parser.isExtendedFilter() === false ) { return false; }
 
@@ -106,6 +112,7 @@ function addExtendedToDNR(context, parser) {
         for ( const { hn, not, bad } of parser.getExtFilterDomainIterator() ) {
             if ( bad ) { continue; }
             if ( exception ) { continue; }
+            if ( isRegexOrPath(hn) ) { continue; }
             let details = context.scriptletFilters.get(argsToken);
             if ( details === undefined ) {
                 context.scriptletFilters.set(argsToken, details = { args });
@@ -163,6 +170,7 @@ function addExtendedToDNR(context, parser) {
         };
         for ( const { hn, not, bad } of parser.getExtFilterDomainIterator() ) {
             if ( bad ) { continue; }
+            if ( isRegexOrPath(hn) ) { continue; }
             if ( not ) {
                 if ( rule.condition.excludedInitiatorDomains === undefined ) {
                     rule.condition.excludedInitiatorDomains = [];
@@ -194,35 +202,8 @@ function addExtendedToDNR(context, parser) {
 
     // Generic cosmetic filtering
     if ( parser.hasOptions() === false ) {
-        const { compiled } = parser.result;
-        if ( compiled === undefined ) { return; }
-        if ( compiled.length <= 1 ) { return; }
-        if ( parser.isException() ) {
-            if ( context.genericCosmeticExceptions === undefined ) {
-                context.genericCosmeticExceptions = new Set();
-            }
-            context.genericCosmeticExceptions.add(compiled);
-            return;
-        }
-        if ( compiled.charCodeAt(0) === 0x7B /* '{' */ ) { return; }
-        const key = keyFromSelector(compiled);
-        if ( key === undefined ) {
-            if ( context.genericHighCosmeticFilters === undefined ) {
-                context.genericHighCosmeticFilters = new Set();
-            }
-            context.genericHighCosmeticFilters.add(compiled);
-            return;
-        }
-        const type = key.charCodeAt(0);
-        const hash = hashFromStr(type, key.slice(1));
-        if ( context.genericCosmeticFilters === undefined ) {
-            context.genericCosmeticFilters = new Map();
-        }
-        let bucket = context.genericCosmeticFilters.get(hash);
-        if ( bucket === undefined ) {
-            context.genericCosmeticFilters.set(hash, bucket = []);
-        }
-        bucket.push(compiled);
+        const { compiled, exception } = parser.result;
+        addGenericCosmeticFilter(context, compiled, exception);
         return;
     }
 
@@ -233,25 +214,28 @@ function addExtendedToDNR(context, parser) {
     if ( context.specificCosmeticFilters === undefined ) {
         context.specificCosmeticFilters = new Map();
     }
+    const { compiled, exception, raw } = parser.result;
+    if ( compiled === undefined ) {
+        context.specificCosmeticFilters.set(`Invalid filter: ...##${raw}`, {
+            rejected: true
+        });
+        return;
+    }
+    let details = context.specificCosmeticFilters.get(compiled);
+    let isGeneric = true;
     for ( const { hn, not, bad } of parser.getExtFilterDomainIterator() ) {
         if ( bad ) { continue; }
-        let { compiled, exception, raw } = parser.result;
-        if ( exception ) { continue; }
-        let rejected;
-        if ( compiled === undefined ) {
-            rejected = `Invalid filter: ${hn}##${raw}`;
-        }
-        if ( rejected ) {
-            compiled = rejected;
-        }
-        let details = context.specificCosmeticFilters.get(compiled);
+        if ( not && exception ) { continue; }
+        isGeneric = false;
+        // TODO: Support regex- and path-based entries
+        if ( isRegexOrPath(hn) ) { continue; }
         if ( details === undefined ) {
-            details = {};
-            if ( rejected ) { details.rejected = true; }
-            context.specificCosmeticFilters.set(compiled, details);
+            context.specificCosmeticFilters.set(compiled, details = {});
         }
-        if ( rejected ) { continue; }
-        if ( not ) {
+        if ( compiled.startsWith('{') === false ) {
+            details.key = keyFromSelector(compiled);
+        }
+        if ( exception || not ) {
             if ( details.excludeMatches === undefined ) {
                 details.excludeMatches = [];
             }
@@ -268,6 +252,12 @@ function addExtendedToDNR(context, parser) {
         }
         details.matches.push(hn);
     }
+    if ( details === undefined ) { return; }
+    if ( exception ) { return; }
+    if ( compiled.startsWith('{') ) { return; }
+    if ( isGeneric ) {
+        addGenericCosmeticFilter(context, compiled, false);
+    }
 }
 
 /******************************************************************************/
@@ -282,6 +272,7 @@ function addToDNR(context, list) {
         toDNR: true,
         nativeCssHas: env.includes('native_css_has'),
         badTypes: [ sfp.NODE_TYPE_NET_OPTION_NAME_REDIRECTRULE ],
+        trustedSource: list.trustedSource || undefined,
     });
     const compiler = staticNetFilteringEngine.createCompiler();
 
@@ -342,6 +333,94 @@ function addToDNR(context, list) {
 
 /******************************************************************************/
 
+// Merge rules where possible by merging arrays of a specific property.
+//
+// https://github.com/uBlockOrigin/uBOL-home/issues/10#issuecomment-1304822579
+//   Do not merge rules which have errors.
+
+function mergeRules(rulesetMap, mergeTarget) {
+    const sorter = (_, v) => {
+        if ( Array.isArray(v) ) {
+            return typeof v[0] === 'string' ? v.sort() : v;
+        }
+        if ( v instanceof Object ) {
+            const sorted = {};
+            for ( const kk of Object.keys(v).sort() ) {
+                sorted[kk] = v[kk];
+            }
+            return sorted;
+        }
+        return v;
+    };
+    const ruleHasher = (rule, target) => {
+        return JSON.stringify(rule, (k, v) => {
+            if ( k.startsWith('_') ) { return; }
+            if ( k === target ) { return; }
+            return sorter(k, v);
+        });
+    };
+    const extractTargetValue = (obj, target) => {
+        for ( const [ k, v ] of Object.entries(obj) ) {
+            if ( Array.isArray(v) && k === target ) { return v; }
+            if ( v instanceof Object ) {
+                const r = extractTargetValue(v, target);
+                if ( r !== undefined ) { return r; }
+            }
+        }
+    };
+    const extractTargetOwner = (obj, target) => {
+        for ( const [ k, v ] of Object.entries(obj) ) {
+            if ( Array.isArray(v) && k === target ) { return obj; }
+            if ( v instanceof Object ) {
+                const r = extractTargetOwner(v, target);
+                if ( r !== undefined ) { return r; }
+            }
+        }
+    };
+    const mergeMap = new Map();
+    for ( const [ id, rule ] of rulesetMap ) {
+        if ( rule._error !== undefined ) { continue; }
+        const hash = ruleHasher(rule, mergeTarget);
+        if ( mergeMap.has(hash) === false ) {
+            mergeMap.set(hash, []);
+        }
+        mergeMap.get(hash).push(id);
+    }
+    for ( const ids of mergeMap.values() ) {
+        if ( ids.length === 1 ) { continue; }
+        const leftHand = rulesetMap.get(ids[0]);
+        const leftHandSet = new Set(
+            extractTargetValue(leftHand, mergeTarget) || []
+        );
+        for ( let i = 1; i < ids.length; i++ ) {
+            const rightHandId = ids[i];
+            const rightHand = rulesetMap.get(rightHandId);
+            const rightHandArray =  extractTargetValue(rightHand, mergeTarget);
+            if ( rightHandArray !== undefined ) {
+                if ( leftHandSet.size !== 0 ) {
+                    for ( const item of rightHandArray ) {
+                        leftHandSet.add(item);
+                    }
+                }
+            } else {
+                leftHandSet.clear();
+            }
+            rulesetMap.delete(rightHandId);
+        }
+        const leftHandOwner = extractTargetOwner(leftHand, mergeTarget);
+        if ( leftHandSet.size > 1 ) {
+            //if ( leftHandOwner === undefined ) { debugger; }
+            leftHandOwner[mergeTarget] = Array.from(leftHandSet).sort();
+        } else if ( leftHandSet.size === 0 ) {
+            if ( leftHandOwner !== undefined ) {
+                leftHandOwner[mergeTarget] = undefined;
+            }
+        }
+    }
+}
+
+/******************************************************************************/
+
 function finalizeRuleset(context, network) {
     const ruleset = network.ruleset;
 
@@ -353,95 +432,25 @@ function finalizeRuleset(context, network) {
             rulesetMap.set(ruleId++, rule);
         }
     }
-    // Merge rules where possible by merging arrays of a specific property.
-    //
-    // https://github.com/uBlockOrigin/uBOL-home/issues/10#issuecomment-1304822579
-    //   Do not merge rules which have errors.
-    const mergeRules = (rulesetMap, mergeTarget) => {
-        const mergeMap = new Map();
-        const sorter = (_, v) => {
-            if ( Array.isArray(v) ) {
-                return typeof v[0] === 'string' ? v.sort() : v;
-            }
-            if ( v instanceof Object ) {
-                const sorted = {};
-                for ( const kk of Object.keys(v).sort() ) {
-                    sorted[kk] = v[kk];
-                }
-                return sorted;
-            }
-            return v;
-        };
-        const ruleHasher = (rule, target) => {
-            return JSON.stringify(rule, (k, v) => {
-                if ( k.startsWith('_') ) { return; }
-                if ( k === target ) { return; }
-                return sorter(k, v);
-            });
-        };
-        const extractTargetValue = (obj, target) => {
-            for ( const [ k, v ] of Object.entries(obj) ) {
-                if ( Array.isArray(v) && k === target ) { return v; }
-                if ( v instanceof Object ) {
-                    const r = extractTargetValue(v, target);
-                    if ( r !== undefined ) { return r; }
-                }
-            }
-        };
-        const extractTargetOwner = (obj, target) => {
-            for ( const [ k, v ] of Object.entries(obj) ) {
-                if ( Array.isArray(v) && k === target ) { return obj; }
-                if ( v instanceof Object ) {
-                    const r = extractTargetOwner(v, target);
-                    if ( r !== undefined ) { return r; }
-                }
-            }
-        };
-        for ( const [ id, rule ] of rulesetMap ) {
-            if ( rule._error !== undefined ) { continue; }
-            const hash = ruleHasher(rule, mergeTarget);
-            if ( mergeMap.has(hash) === false ) {
-                mergeMap.set(hash, []);
-            }
-            mergeMap.get(hash).push(id);
-        }
-        for ( const ids of mergeMap.values() ) {
-            if ( ids.length === 1 ) { continue; }
-            const leftHand = rulesetMap.get(ids[0]);
-            const leftHandSet = new Set(
-                extractTargetValue(leftHand, mergeTarget) || []
-            );
-            for ( let i = 1; i < ids.length; i++ ) {
-                const rightHandId = ids[i];
-                const rightHand = rulesetMap.get(rightHandId);
-                const rightHandArray =  extractTargetValue(rightHand, mergeTarget);
-                if ( rightHandArray !== undefined ) {
-                    if ( leftHandSet.size !== 0 ) {
-                        for ( const item of rightHandArray ) {
-                            leftHandSet.add(item);
-                        }
-                    }
-                } else {
-                    leftHandSet.clear();
-                }
-                rulesetMap.delete(rightHandId);
-            }
-            const leftHandOwner = extractTargetOwner(leftHand, mergeTarget);
-            if ( leftHandSet.size > 1 ) {
-                //if ( leftHandOwner === undefined ) { debugger; }
-                leftHandOwner[mergeTarget] = Array.from(leftHandSet).sort();
-            } else if ( leftHandSet.size === 0 ) {
-                if ( leftHandOwner !== undefined ) {
-                    leftHandOwner[mergeTarget] = undefined;
-                }
-            }
-        }
-    };
     mergeRules(rulesetMap, 'resourceTypes');
+    mergeRules(rulesetMap, 'removeParams');
     mergeRules(rulesetMap, 'initiatorDomains');
     mergeRules(rulesetMap, 'requestDomains');
-    mergeRules(rulesetMap, 'removeParams');
     mergeRules(rulesetMap, 'responseHeaders');
+
+    // Convert back single-entry requestDomains into pattern-based filters
+    // https://github.com/uBlockOrigin/uBOL-home/issues/327
+    // TODO: Remove when (if) Safari is changed to interpret requestDomains as
+    //       in other browsers.
+    for ( const rule of rulesetMap.values() ) {
+        const { condition } = rule;
+        if ( condition?.requestDomains === undefined ) { continue; }
+        if ( condition.requestDomains.length !== 1 ) { continue; }
+        if ( condition.urlFilter !== undefined ) { continue; }
+        if ( condition.regexFilter !== undefined ) { continue; }
+        condition.urlFilter = `||${condition.requestDomains[0]}^`;
+        condition.requestDomains = undefined;
+    }
 
     // Patch id
     const rulesetFinal = [];
@@ -467,6 +476,7 @@ function finalizeRuleset(context, network) {
 
 async function dnrRulesetFromRawLists(lists, options = {}) {
     const context = Object.assign({}, options);
+    context.bad = options.networkBad;
     staticNetFilteringEngine.dnrFromCompiled('begin', context);
     context.extensionPaths = new Map(context.extensionPaths || []);
     const toLoad = [];
@@ -481,8 +491,8 @@ async function dnrRulesetFromRawLists(lists, options = {}) {
     await Promise.all(toLoad);
     const result = {
         network: staticNetFilteringEngine.dnrFromCompiled('end', context),
-        genericCosmetic: context.genericCosmeticFilters,
-        genericHighCosmetic: context.genericHighCosmeticFilters,
+        networkBad: context.bad,
+        genericCosmeticFilters: context.genericCosmeticFilters,
         genericCosmeticExceptions: context.genericCosmeticExceptions,
         specificCosmetic: context.specificCosmeticFilters,
         scriptlet: context.scriptletFilters,
@@ -496,4 +506,4 @@ async function dnrRulesetFromRawLists(lists, options = {}) {
 
 /******************************************************************************/
 
-export { dnrRulesetFromRawLists };
+export { dnrRulesetFromRawLists, mergeRules };

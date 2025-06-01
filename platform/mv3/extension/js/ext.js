@@ -19,19 +19,11 @@
     Home: https://github.com/gorhill/uBlock
 */
 
-/* jshint esversion:11 */
-
-'use strict';
+import { webext } from './ext-compat.js';
 
 /******************************************************************************/
 
-export const browser =
-    self.browser instanceof Object &&
-    self.browser instanceof Element === false
-        ? self.browser
-        : self.chrome;
-
-export const dnr = browser.declarativeNetRequest;
+export const browser = webext;
 export const i18n = browser.i18n;
 export const runtime = browser.runtime;
 
@@ -41,21 +33,8 @@ export const runtime = browser.runtime;
 // send a message, we try a few more times when the message fails to be sent.
 
 export function sendMessage(msg) {
-    return new Promise((resolve, reject) => {
-        let i = 5;
-        const send = ( ) => {
-            runtime.sendMessage(msg).then(response => {
-                resolve(response);
-            }).catch(reason => {
-                i -= 1;
-                if ( i <= 0 ) {
-                    reject(reason);
-                } else {
-                    setTimeout(send, 200);
-                }
-            });
-        };
-        send();
+    return runtime.sendMessage(msg).catch(reason => {
+        console.log(reason);
     });
 }
 
@@ -68,7 +47,7 @@ export async function localRead(key) {
         const bin = await browser.storage.local.get(key);
         if ( bin instanceof Object === false ) { return; }
         return bin[key] ?? undefined;
-    } catch(ex) {
+    } catch {
     }
 }
 
@@ -93,7 +72,7 @@ export async function sessionRead(key) {
         const bin = await browser.storage.session.get(key);
         if ( bin instanceof Object === false ) { return; }
         return bin[key] ?? undefined;
-    } catch(ex) {
+    } catch {
     }
 }
 
@@ -103,16 +82,22 @@ export async function sessionWrite(key, value) {
     return browser.storage.session.set({ [key]: value });
 }
 
+export async function sessionRemove(key) {
+    if ( browser.storage instanceof Object === false ) { return; }
+    if ( browser.storage.session instanceof Object === false ) { return; }
+    return browser.storage.session.remove(key);
+}
+
 /******************************************************************************/
 
 export async function adminRead(key) {
     if ( browser.storage instanceof Object === false ) { return; }
-    if ( browser.storage.local instanceof Object === false ) { return; }
+    if ( browser.storage.managed instanceof Object === false ) { return; }
     try {
         const bin = await browser.storage.managed.get(key);
         if ( bin instanceof Object === false ) { return; }
         return bin[key] ?? undefined;
-    } catch(ex) {
+    } catch {
     }
 }
 

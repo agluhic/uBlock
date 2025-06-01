@@ -19,22 +19,21 @@
     Home: https://github.com/gorhill/uBlock
 */
 
-/* jshint esversion:11 */
-
-'use strict';
-
-/******************************************************************************/
-
-import { browser } from './ext.js';
-import { fetchJSON } from './fetch.js';
-import { getFilteringModeDetails } from './mode-manager.js';
-import { getEnabledRulesetsDetails } from './ruleset-manager.js';
-
 import * as ut from './utils.js';
 
-/******************************************************************************/
+import {
+    browser,
+    localRemove,
+    localWrite,
+} from './ext.js';
 
-const isGecko = browser.runtime.getURL('').startsWith('moz-extension://');
+import { fetchJSON } from './fetch.js';
+import { getEnabledRulesetsDetails } from './ruleset-manager.js';
+import { getFilteringModeDetails } from './mode-manager.js';
+import { registerToolbarIconToggler } from './action.js';
+import { ubolLog } from './debug.js';
+
+/******************************************************************************/
 
 const resourceDetailPromises = new Map();
 
@@ -60,15 +59,13 @@ function getGenericDetails() {
 
 /******************************************************************************/
 
-// Important: We need to sort the arrays for fast comparison
-const arrayEq = (a = [], b = [], sort = true) => {
-    const alen = a.length;
-    if ( alen !== b.length ) { return false; }
-    if ( sort ) { a.sort(); b.sort(); }
-    for ( let i = 0; i < alen; i++ ) {
-        if ( a[i] !== b[i] ) { return false; }
+const normalizeMatches = matches => {
+    if ( matches.length <= 1 ) { return; }
+    if ( matches.includes('<all_urls>') === false ) {
+        if ( matches.includes('*://*/*') === false ) { return; }
     }
-    return true;
+    matches.length = 0;
+    matches.push('<all_urls>');
 };
 
 /******************************************************************************/
@@ -100,11 +97,17 @@ function registerHighGeneric(context, genericDetails) {
     const { before, filteringModeDetails, rulesetsDetails } = context;
 
     const excludeHostnames = [];
+    const includeHostnames = [];
     const css = [];
     for ( const details of rulesetsDetails ) {
         const hostnames = genericDetails.get(details.id);
-        if ( hostnames !== undefined ) {
-            excludeHostnames.push(...hostnames);
+        if ( hostnames ) {
+            if ( hostnames.unhide ) {
+                excludeHostnames.push(...hostnames.unhide);
+            }
+            if ( hostnames.hide ) {
+                includeHostnames.push(...hostnames.hide);
+            }
         }
         const count = details.css?.generichigh || 0;
         if ( count === 0 ) { continue; }
@@ -145,9 +148,12 @@ function registerHighGeneric(context, genericDetails) {
         id: 'css-generichigh',
         css,
         matches,
-        excludeMatches,
+        allFrames: true,
         runAt: 'document_end',
     };
+    if ( excludeMatches.length !== 0 ) {
+        directive.excludeMatches = excludeMatches;
+    }
 
     // register
     if ( registered === undefined ) {
@@ -157,9 +163,9 @@ function registerHighGeneric(context, genericDetails) {
 
     // update
     if (
-        arrayEq(registered.css, css, false) === false ||
-        arrayEq(registered.matches, matches) === false ||
-        arrayEq(registered.excludeMatches, excludeMatches) === false
+        ut.strArrayEq(registered.css, css, false) === false ||
+        ut.strArrayEq(registered.matches, matches) === false ||
+        ut.strArrayEq(registered.excludeMatches, excludeMatches) === false
     ) {
         context.toRemove.push('css-generichigh');
         context.toAdd.push(directive);
@@ -171,12 +177,18 @@ function registerHighGeneric(context, genericDetails) {
 function registerGeneric(context, genericDetails) {
     const { before, filteringModeDetails, rulesetsDetails } = context;
 
-    const excludeHostnames = [];
+    const excludedByFilter = [];
+    const includedByFilter = [];
     const js = [];
     for ( const details of rulesetsDetails ) {
         const hostnames = genericDetails.get(details.id);
-        if ( hostnames !== undefined ) {
-            excludeHostnames.push(...hostnames);
+        if ( hostnames ) {
+            if ( hostnames.unhide ) {
+                excludedByFilter.push(...hostnames.unhide);
+            }
+            if ( hostnames.hide ) {
+                includedByFilter.push(...hostnames.hide);
+            }
         }
         const count = details.css?.generic || 0;
         if ( count === 0 ) { continue; }
@@ -185,55 +197,93 @@ function registerGeneric(context, genericDetails) {
 
     if ( js.length === 0 ) { return; }
 
+    js.unshift('/js/scripting/isolated-api.js');
     js.push('/js/scripting/css-generic.js');
 
     const { none, basic, optimal, complete } = filteringModeDetails;
-    const matches = [];
-    const excludeMatches = [];
-    if ( complete.has('all-urls') ) {
-        excludeMatches.push(...ut.matchesFromHostnames(none));
-        excludeMatches.push(...ut.matchesFromHostnames(basic));
-        excludeMatches.push(...ut.matchesFromHostnames(optimal));
-        excludeMatches.push(...ut.matchesFromHostnames(excludeHostnames));
-        matches.push('<all_urls>');
-    } else {
-        matches.push(
+    const includedByMode = [ ...complete ];
+    const excludedByMode = [ ...none, ...basic, ...optimal ];
+
+    if ( complete.has('all-urls') === false ) {
+        const matches = [
             ...ut.matchesFromHostnames(
-                ut.subtractHostnameIters(
-                    Array.from(complete),
-                    excludeHostnames
-                )
-            )
-        );
-    }
-
-    if ( matches.length === 0 ) { return; }
-
-    const registered = before.get('css-generic');
-    before.delete('css-generic'); // Important!
-
-    const directive = {
-        id: 'css-generic',
-        js,
-        matches,
-        excludeMatches,
-        runAt: 'document_idle',
-    };
-
-    // register
-    if ( registered === undefined ) {
-        context.toAdd.push(directive);
+                ut.subtractHostnameIters(includedByMode, excludedByFilter)
+            ),
+            ...ut.matchesFromHostnames(
+                ut.intersectHostnameIters(includedByMode, includedByFilter)
+            ),
+        ];
+        if ( matches.length === 0 ) { return; }
+        const registered = before.get('css-generic-some');
+        before.delete('css-generic-some'); // Important!
+        const directive = {
+            id: 'css-generic-some',
+            js,
+            allFrames: true,
+            matches,
+            runAt: 'document_idle',
+        };
+        if ( registered === undefined ) { // register
+            context.toAdd.push(directive);
+        } else if ( // update
+            ut.strArrayEq(registered.js, js, false) === false ||
+            ut.strArrayEq(registered.matches, directive.matches) === false
+        ) {
+            context.toRemove.push('css-generic-some');
+            context.toAdd.push(directive);
+        }
         return;
     }
 
-    // update
-    if (
-        arrayEq(registered.js, js, false) === false ||
-        arrayEq(registered.matches, matches) === false ||
-        arrayEq(registered.excludeMatches, excludeMatches) === false
+    const excludeMatches = [
+        ...ut.matchesFromHostnames(excludedByMode),
+        ...ut.matchesFromHostnames(excludedByFilter),
+    ];
+    const registeredAll = before.get('css-generic-all');
+    before.delete('css-generic-all'); // Important!
+    const directiveAll = {
+        id: 'css-generic-all',
+        js,
+        allFrames: true,
+        matches: [ '<all_urls>' ],
+        runAt: 'document_idle',
+    };
+    if ( excludeMatches.length !== 0 ) {
+        directiveAll.excludeMatches = excludeMatches;
+    }
+
+    if ( registeredAll === undefined ) { // register
+        context.toAdd.push(directiveAll);
+    } else if ( // update
+        ut.strArrayEq(registeredAll.js, js, false) === false ||
+        ut.strArrayEq(registeredAll.excludeMatches, directiveAll.excludeMatches) === false
     ) {
-        context.toRemove.push('css-generic');
-        context.toAdd.push(directive);
+        context.toRemove.push('css-generic-all');
+        context.toAdd.push(directiveAll);
+    }
+    const matches = [
+        ...ut.matchesFromHostnames(
+            ut.subtractHostnameIters(includedByFilter, excludedByMode)
+        ),
+    ];
+    if ( matches.length === 0 ) { return; }
+    const registeredSome = before.get('css-generic-some');
+    before.delete('css-generic-some'); // Important!
+    const directiveSome = {
+        id: 'css-generic-some',
+        js,
+        allFrames: true,
+        matches,
+        runAt: 'document_idle',
+    };
+    if ( registeredSome === undefined ) { // register
+        context.toAdd.push(directiveSome);
+    } else if ( // update
+        ut.strArrayEq(registeredSome.js, js, false) === false ||
+        ut.strArrayEq(registeredSome.matches, directiveSome.matches) === false
+    ) {
+        context.toRemove.push('css-generic-some');
+        context.toAdd.push(directiveSome);
     }
 }
 
@@ -257,6 +307,9 @@ function registerProcedural(context) {
     ];
     if ( matches.length === 0 ) { return; }
 
+    normalizeMatches(matches);
+
+    js.unshift('/js/scripting/isolated-api.js');
     js.push('/js/scripting/css-procedural.js');
 
     const excludeMatches = [];
@@ -273,11 +326,13 @@ function registerProcedural(context) {
     const directive = {
         id: 'css-procedural',
         js,
-        allFrames: true,
         matches,
-        excludeMatches,
-        runAt: 'document_end',
+        allFrames: true,
+        runAt: 'document_start',
     };
+    if ( excludeMatches.length !== 0 ) {
+        directive.excludeMatches = excludeMatches;
+    }
 
     // register
     if ( registered === undefined ) {
@@ -287,9 +342,9 @@ function registerProcedural(context) {
 
     // update
     if (
-        arrayEq(registered.js, js, false) === false ||
-        arrayEq(registered.matches, matches) === false ||
-        arrayEq(registered.excludeMatches, excludeMatches) === false
+        ut.strArrayEq(registered.js, js, false) === false ||
+        ut.strArrayEq(registered.matches, matches) === false ||
+        ut.strArrayEq(registered.excludeMatches, excludeMatches) === false
     ) {
         context.toRemove.push('css-procedural');
         context.toAdd.push(directive);
@@ -316,6 +371,9 @@ function registerDeclarative(context) {
     ];
     if ( matches.length === 0 ) { return; }
 
+    normalizeMatches(matches);
+
+    js.unshift('/js/scripting/isolated-api.js');
     js.push('/js/scripting/css-declarative.js');
 
     const excludeMatches = [];
@@ -332,11 +390,13 @@ function registerDeclarative(context) {
     const directive = {
         id: 'css-declarative',
         js,
-        allFrames: true,
         matches,
-        excludeMatches,
+        allFrames: true,
         runAt: 'document_start',
     };
+    if ( excludeMatches.length !== 0 ) {
+        directive.excludeMatches = excludeMatches;
+    }
 
     // register
     if ( registered === undefined ) {
@@ -346,9 +406,9 @@ function registerDeclarative(context) {
 
     // update
     if (
-        arrayEq(registered.js, js, false) === false ||
-        arrayEq(registered.matches, matches) === false ||
-        arrayEq(registered.excludeMatches, excludeMatches) === false
+        ut.strArrayEq(registered.js, js, false) === false ||
+        ut.strArrayEq(registered.matches, matches) === false ||
+        ut.strArrayEq(registered.excludeMatches, excludeMatches) === false
     ) {
         context.toRemove.push('css-declarative');
         context.toAdd.push(directive);
@@ -375,6 +435,9 @@ function registerSpecific(context) {
     ];
     if ( matches.length === 0 ) { return; }
 
+    normalizeMatches(matches);
+
+    js.unshift('/js/scripting/isolated-api.js');
     js.push('/js/scripting/css-specific.js');
 
     const excludeMatches = [];
@@ -391,11 +454,13 @@ function registerSpecific(context) {
     const directive = {
         id: 'css-specific',
         js,
-        allFrames: true,
         matches,
-        excludeMatches,
+        allFrames: true,
         runAt: 'document_start',
     };
+    if ( excludeMatches.length !== 0 ) {
+        directive.excludeMatches = excludeMatches;
+    }
 
     // register
     if ( registered === undefined ) {
@@ -405,9 +470,9 @@ function registerSpecific(context) {
 
     // update
     if (
-        arrayEq(registered.js, js, false) === false ||
-        arrayEq(registered.matches, matches) === false ||
-        arrayEq(registered.excludeMatches, excludeMatches) === false
+        ut.strArrayEq(registered.js, js, false) === false ||
+        ut.strArrayEq(registered.matches, matches) === false ||
+        ut.strArrayEq(registered.excludeMatches, excludeMatches) === false
     ) {
         context.toRemove.push('css-specific');
         context.toAdd.push(directive);
@@ -436,7 +501,7 @@ function registerScriptlet(context, scriptletDetails) {
         const scriptletList = scriptletDetails.get(rulesetId);
         if ( scriptletList === undefined ) { continue; }
 
-        for ( const [ token, scriptletHostnames ] of scriptletList ) {
+        for ( const [ token, details ] of scriptletList ) {
             const id = `${rulesetId}.${token}`;
             const registered = before.get(id);
 
@@ -445,39 +510,38 @@ function registerScriptlet(context, scriptletDetails) {
             let targetHostnames = [];
             if ( hasBroadHostPermission ) {
                 excludeMatches.push(...permissionRevokedMatches);
-                if ( scriptletHostnames.length > 100 ) {
+                if ( details.hostnames.length > 100 ) {
                     targetHostnames = [ '*' ];
                 } else {
-                    targetHostnames = scriptletHostnames;
+                    targetHostnames = details.hostnames;
                 }
             } else if ( permissionGrantedHostnames.length !== 0 ) {
-                if ( scriptletHostnames.includes('*') ) {
+                if ( details.hostnames.includes('*') ) {
                     targetHostnames = permissionGrantedHostnames;
                 } else {
                     targetHostnames = ut.intersectHostnameIters(
-                        permissionGrantedHostnames,
-                        scriptletHostnames
+                        details.hostnames,
+                        permissionGrantedHostnames
                     );
                 }
             }
             if ( targetHostnames.length === 0 ) { continue; }
             matches.push(...ut.matchesFromHostnames(targetHostnames));
+            normalizeMatches(matches);
 
             before.delete(id); // Important!
 
             const directive = {
                 id,
                 js: [ `/rulesets/scripting/scriptlet/${id}.js` ],
-                allFrames: true,
                 matches,
-                excludeMatches,
+                allFrames: true,
+                matchOriginAsFallback: true,
                 runAt: 'document_start',
+                world: details.world,
             };
-
-            // https://bugzilla.mozilla.org/show_bug.cgi?id=1736575
-            //   `MAIN` world not yet supported in Firefox
-            if ( isGecko === false ) {
-                directive.world = 'MAIN';
+            if ( excludeMatches.length !== 0 ) {
+                directive.excludeMatches = excludeMatches;
             }
 
             // register
@@ -488,8 +552,8 @@ function registerScriptlet(context, scriptletDetails) {
 
             // update
             if (
-                arrayEq(registered.matches, matches) === false ||
-                arrayEq(registered.excludeMatches, excludeMatches) === false
+                ut.strArrayEq(registered.matches, matches) === false ||
+                ut.strArrayEq(registered.excludeMatches, excludeMatches) === false
             ) {
                 context.toRemove.push(id);
                 context.toAdd.push(directive);
@@ -500,10 +564,14 @@ function registerScriptlet(context, scriptletDetails) {
 
 /******************************************************************************/
 
-async function registerInjectables(origins) {
-    void origins;
+// Issue: Safari appears to completely ignore excludeMatches
+// https://github.com/radiolondra/ExcludeMatches-Test
 
+async function registerInjectables() {
     if ( browser.scripting === undefined ) { return false; }
+
+    if ( registerInjectables.barrier ) { return true; }
+    registerInjectables.barrier = true;
 
     const [
         filteringModeDetails,
@@ -538,20 +606,33 @@ async function registerInjectables(origins) {
     registerSpecific(context);
     registerGeneric(context, genericDetails);
     registerHighGeneric(context, genericDetails);
+    registerToolbarIconToggler(context);
 
     toRemove.push(...Array.from(before.keys()));
 
     if ( toRemove.length !== 0 ) {
-        ut.ubolLog(`Unregistered ${toRemove} content (css/js)`);
-        await browser.scripting.unregisterContentScripts({ ids: toRemove })
-            .catch(reason => { console.info(reason); });
+        ubolLog(`Unregistered ${toRemove} content (css/js)`);
+        try {
+            await browser.scripting.unregisterContentScripts({ ids: toRemove });
+            localRemove('$scripting.unregisterContentScripts');
+        } catch(reason) {
+            localWrite('$scripting.unregisterContentScripts', reason);
+            console.info(reason);
+        }
     }
 
     if ( toAdd.length !== 0 ) {
-        ut.ubolLog(`Registered ${toAdd.map(v => v.id)} content (css/js)`);
-        await browser.scripting.registerContentScripts(toAdd)
-            .catch(reason => { console.info(reason); });
+        ubolLog(`Registered ${toAdd.map(v => v.id)} content (css/js)`);
+        try {
+            await browser.scripting.registerContentScripts(toAdd);
+            localRemove('$scripting.registerContentScripts');
+        } catch(reason) {
+            localWrite('$scripting.registerContentScripts', reason);
+            console.info(reason);
+        }
     }
+
+    registerInjectables.barrier = false;
 
     return true;
 }

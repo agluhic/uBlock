@@ -19,20 +19,17 @@
     Home: https://github.com/gorhill/uBlock
 */
 
-/* jshint esversion:11 */
-
-'use strict';
-
-/******************************************************************************/
-
-import { browser } from './ext.js';
+import {
+    browser,
+    runtime,
+} from './ext.js';
 
 /******************************************************************************/
 
 function parsedURLromOrigin(origin) {
     try {
         return new URL(origin);
-    } catch(ex) {
+    } catch {
     }
 }
 
@@ -55,6 +52,13 @@ const isDescendantHostname = (hna, hnb) => {
     return hna.charCodeAt(hna.length - hnb.length - 1) === 0x2E /* '.' */;
 };
 
+/**
+ * Returns whether a hostname is part of a collection, or is descendant of an
+ * item in the collection.
+ * @param hna - the hostname representing the needle.
+ * @param iterb - an iterable representing the haystack of hostnames.
+ */
+
 const isDescendantHostnameOfIter = (hna, iterb) => {
     const setb = iterb instanceof Set ? iterb : new Set(iterb);
     if ( setb.has('all-urls') || setb.has('*') ) { return true; }
@@ -67,6 +71,13 @@ const isDescendantHostnameOfIter = (hna, iterb) => {
     }
     return false;
 };
+
+/**
+ * Returns all hostnames in the first collection which are equal or descendant
+ * of hostnames in the second collection.
+ * @param itera - an iterable which hostnames must be filtered out.
+ * @param iterb - an iterable which hostnames must be matched.
+ */
 
 const intersectHostnameIters = (itera, iterb) => {
     const setb = iterb instanceof Set ? iterb : new Set(iterb);
@@ -94,15 +105,13 @@ const subtractHostnameIters = (itera, iterb) => {
 
 /******************************************************************************/
 
+const matchFromHostname = hn =>
+    hn === '*' || hn === 'all-urls' ? '<all_urls>' : `*://*.${hn}/*`;
+
 const matchesFromHostnames = hostnames => {
     const out = [];
     for ( const hn of hostnames ) {
-        if ( hn === '*' || hn === 'all-urls' ) {
-            out.length = 0;
-            out.push('<all_urls>');
-            break;
-        }
-        out.push(`*://*.${hn}/*`);
+        out.push(matchFromHostname(hn));
     }
     return out;
 };
@@ -110,11 +119,11 @@ const matchesFromHostnames = hostnames => {
 const hostnamesFromMatches = origins => {
     const out = [];
     for ( const origin of origins ) {
-        if ( origin === '<all_urls>' ) {
+        if ( origin === '<all_urls>' || origin === '*://*/*' ) {
             out.push('all-urls');
             continue;
         }
-        const match = /^\*:\/\/(?:\*\.)?([^\/]+)\/\*/.exec(origin);
+        const match = /^\*:\/\/(?:\*\.)?([^/]+)\/\*/.exec(origin);
         if ( match === null ) { continue; }
         out.push(match[1]);
     }
@@ -123,40 +132,81 @@ const hostnamesFromMatches = origins => {
 
 /******************************************************************************/
 
-export const broadcastMessage = message => {
+const broadcastMessage = message => {
     const bc = new self.BroadcastChannel('uBOL');
     bc.postMessage(message);
 };
 
 /******************************************************************************/
 
-const ubolLog = (...args) => {
-    // Do not pollute dev console in stable releases.
-    if ( shouldLog !== true ) { return; }
-    console.info('[uBOL]', ...args);
-};
+// https://developer.mozilla.org/docs/Mozilla/Add-ons/WebExtensions/manifest.json/host_permissions#requested_permissions_and_user_prompts
+// "Users can grant or revoke host permissions on an ad hoc basis. Therefore,
+// most browsers treat host_permissions as optional."
 
-const shouldLog = (( ) => {
-    const { id } = browser.runtime;
-    // https://addons.mozilla.org/en-US/firefox/addon/ublock-origin-lite/
-    if ( id === 'uBOLite@raymondhill.net' ) { return false; }
-    // https://chromewebstore.google.com/detail/ddkjiahejlhfcafbddmgiahcphecmpfh
-    if ( id === 'ddkjiahejlhfcafbddmgiahcphecmpfh' ) { return false; }
-    // https://microsoftedge.microsoft.com/addons/detail/cimighlppcgcoapaliogpjjdehbnofhn
-    if ( id === 'cimighlppcgcoapaliogpjjdehbnofhn' ) { return false; }
+async function hasBroadHostPermissions() {
+    return browser.permissions.getAll().then(permissions =>
+        permissions.origins.includes('<all_urls>') ||
+        permissions.origins.includes('*://*/*')
+    ).catch(( ) => false);
+}
+
+/******************************************************************************/
+
+async function gotoURL(url, type) {
+    const pageURL = new URL(url, runtime.getURL('/'));
+    const tabs = await browser.tabs.query({
+        url: pageURL.href,
+        windowType: type !== 'popup' ? 'normal' : 'popup'
+    });
+
+    if ( Array.isArray(tabs) && tabs.length !== 0 ) {
+        const { windowId, id } = tabs[0];
+        return Promise.all([
+            browser.windows.update(windowId, { focused: true }),
+            browser.tabs.update(id, { active: true }),
+        ]);
+    }
+
+    if ( type === 'popup' ) {
+        return browser.windows.create({
+            type: 'popup',
+            url: pageURL.href,
+        });
+    }
+
+    return browser.tabs.create({
+        active: true,
+        url: pageURL.href,
+    });
+}
+
+/******************************************************************************/
+
+// Important: We need to sort the arrays for fast comparison
+const strArrayEq = (a = [], b = [], sort = true) => {
+    const alen = a.length;
+    if ( alen !== b.length ) { return false; }
+    if ( sort ) { a.sort(); b.sort(); }
+    for ( let i = 0; i < alen; i++ ) {
+        if ( a[i] !== b[i] ) { return false; }
+    }
     return true;
-})();
+};
 
 /******************************************************************************/
 
 export {
+    broadcastMessage,
     parsedURLromOrigin,
     toBroaderHostname,
     isDescendantHostname,
     isDescendantHostnameOfIter,
     intersectHostnameIters,
     subtractHostnameIters,
+    matchFromHostname,
     matchesFromHostnames,
     hostnamesFromMatches,
-    ubolLog,
+    hasBroadHostPermissions,
+    gotoURL,
+    strArrayEq,
 };

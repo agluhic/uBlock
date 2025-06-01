@@ -19,183 +19,36 @@
     Home: https://github.com/gorhill/uBlock
 */
 
-import { browser, localRead, localWrite, sendMessage } from './ext.js';
-import { dom, qs$, qsa$ } from './dom.js';
-import { i18n, i18n$ } from './i18n.js';
+import { browser, sendMessage } from './ext.js';
+import { dom, qs$ } from './dom.js';
+import { hashFromIterable } from './dashboard.js';
+import { i18n$ } from './i18n.js';
 import punycode from './punycode.js';
+import { renderFilterLists } from './filter-lists.js';
 
 /******************************************************************************/
 
-const rulesetMap = new Map();
-let cachedRulesetData = {};
-let hideUnusedSet = new Set([ 'regions' ]);
+const cm6 = self.cm6;
 
-/******************************************************************************/
-
-function renderNumber(value) {
-    return value.toLocaleString();
-}
-
-function hashFromIterable(iter) {
-    return Array.from(iter).sort().join('\n');
-}
-
-/******************************************************************************/
-
-function rulesetStats(rulesetId) {
-    const hasOmnipotence = cachedRulesetData.defaultFilteringMode > 1;
-    const rulesetDetails = rulesetMap.get(rulesetId);
-    if ( rulesetDetails === undefined ) { return; }
-    const { rules, filters } = rulesetDetails;
-    let ruleCount = rules.plain + rules.regex;
-    if ( hasOmnipotence ) {
-        ruleCount += rules.removeparam + rules.redirect + rules.modifyHeaders;
+const cmTrustedSites = (( ) => {
+    const options = {};
+    if ( dom.cl.has(':root', 'dark') ) {
+        options.oneDark = true;
     }
-    const filterCount = filters.accepted;
-    return { ruleCount, filterCount };
-}
+    options.placeholder = i18n$('noFilteringModePlaceholder');
+    return cm6.createEditorView(options, qs$('#trustedSites'));
+})();
+
+let cachedRulesetData = {};
 
 /******************************************************************************/
 
-function renderFilterLists() {
-    const { enabledRulesets, rulesetDetails } = cachedRulesetData;
-    const listGroupTemplate = qs$('#templates .groupEntry');
-    const listEntryTemplate = qs$('#templates .listEntry');
-    const listStatsTemplate = i18n$('perRulesetStats');
-    const groupNames = new Map([ [ 'user', '' ] ]);
-
-    const liFromListEntry = function(ruleset, li, hideUnused) {
-        if ( !li ) {
-            li = dom.clone(listEntryTemplate);
-        }
-        const on = enabledRulesets.includes(ruleset.id);
-        dom.cl.toggle(li, 'checked', on);
-        dom.cl.toggle(li, 'unused', hideUnused && !on);
-        qs$(li, 'input[type="checkbox"]').checked = on;
-        if ( dom.attr(li, 'data-listkey') !== ruleset.id ) {
-            dom.attr(li, 'data-listkey', ruleset.id);
-            qs$(li, '.listname').append(i18n.patchUnicodeFlags(ruleset.name));
-            dom.cl.remove(li, 'toRemove');
-            if ( ruleset.homeURL ) {
-                dom.cl.add(li, 'support');
-                dom.attr(qs$(li, 'a.support'), 'href', ruleset.homeURL);
-            } else {
-                dom.cl.remove(li, 'support');
-            }
-            if ( ruleset.instructionURL ) {
-                dom.cl.add(li, 'mustread');
-                dom.attr(qs$(li, 'a.mustread'), 'href', ruleset.instructionURL);
-            } else {
-                dom.cl.remove(li, 'mustread');
-            }
-            dom.cl.toggle(li, 'isDefault', ruleset.id === 'default');
-        }
-        const stats = rulesetStats(ruleset.id);
-        li.title = listStatsTemplate
-            .replace('{{ruleCount}}', renderNumber(stats.ruleCount))
-            .replace('{{filterCount}}', renderNumber(stats.filterCount));
-        dom.attr(
-            qs$(li, '.input.checkbox'),
-            'disabled',
-            stats.ruleCount === 0 ? '' : null
-        );
-        dom.cl.remove(li, 'discard');
-        return li;
-    };
-
-    const listEntryCountFromGroup = function(groupRulesets) {
-        if ( Array.isArray(groupRulesets) === false ) { return ''; }
-        let count = 0,
-            total = 0;
-        for ( const ruleset of groupRulesets ) {
-            if ( enabledRulesets.includes(ruleset.id) ) {
-                count += 1;
-            }
-            total += 1;
-        }
-        return total !== 0 ?
-            `(${count.toLocaleString()}/${total.toLocaleString()})` :
-            '';
-    };
-
-    const liFromListGroup = function(groupKey, groupRulesets) {
-        let liGroup = qs$(`#lists > .groupEntry[data-groupkey="${groupKey}"]`);
-        if ( liGroup === null ) {
-            liGroup = dom.clone(listGroupTemplate);
-            let groupName = groupNames.get(groupKey);
-            if ( groupName === undefined ) {
-                groupName = i18n$('3pGroup' + groupKey.charAt(0).toUpperCase() + groupKey.slice(1));
-                groupNames.set(groupKey, groupName);
-            }
-            if ( groupName !== '' ) {
-                dom.text(qs$(liGroup, '.geName'), groupName);
-            }
-        }
-        if ( qs$(liGroup, '.geName:empty') === null ) {
-            dom.text(
-                qs$(liGroup, '.geCount'),
-                listEntryCountFromGroup(groupRulesets)
-            );
-        }
-        const hideUnused = mustHideUnusedLists(groupKey);
-        dom.cl.toggle(liGroup, 'hideUnused', hideUnused);
-        const ulGroup = qs$(liGroup, '.listEntries');
-        if ( !groupRulesets ) { return liGroup; }
-        groupRulesets.sort(function(a, b) {
-            return (a.name || '').localeCompare(b.name || '');
-        });
-        for ( let i = 0; i < groupRulesets.length; i++ ) {
-            const liEntry = liFromListEntry(
-                groupRulesets[i],
-                ulGroup.children[i],
-                hideUnused
-            );
-            if ( liEntry.parentElement === null ) {
-                ulGroup.appendChild(liEntry);
-            }
-        }
-        return liGroup;
-    };
-
-    // Visually split the filter lists in groups
-    const ulLists = qs$('#lists');
-    const groups = new Map([
-        [
-            'default',
-            rulesetDetails.filter(ruleset =>
-                ruleset.id === 'default' 
-            ),
-        ],
-        [
-            'annoyances',
-            rulesetDetails.filter(ruleset =>
-                ruleset.group === 'annoyances'
-            ),
-        ],
-        [
-            'misc',
-            rulesetDetails.filter(ruleset =>
-                ruleset.id !== 'default' &&
-                ruleset.group === undefined &&
-                typeof ruleset.lang !== 'string' 
-            ),
-        ],
-        [
-            'regions',
-            rulesetDetails.filter(ruleset =>
-                typeof ruleset.lang === 'string' 
-            ),
-        ],
-    ]);
-
-    dom.cl.toggle(dom.body, 'hideUnused', mustHideUnusedLists('*'));
-
-    for ( const [ groupKey, groupRulesets ] of groups ) {
-        const liGroup = liFromListGroup(groupKey, groupRulesets);
-        dom.attr(liGroup, 'data-groupkey', groupKey);
-        if ( liGroup.parentElement === null ) {
-            ulLists.appendChild(liGroup);
-        }
+function renderAdminRules() {
+    const { disabledFeatures: forbid = [] } = cachedRulesetData;
+    if ( forbid.length === 0 ) { return; }
+    dom.body.dataset.forbid = forbid.join(' ');
+    if ( forbid.includes('dashboard') ) {
+        dom.body.dataset.pane = 'about';
     }
 }
 
@@ -221,26 +74,19 @@ function renderWidgets() {
         }
     }
 
-    // Compute total counts
-    let rulesetCount = 0;
-    let filterCount = 0;
-    let ruleCount = 0;
-    for ( const liEntry of qsa$('#lists .listEntry[data-listkey]') ) {
-        if ( qs$(liEntry, 'input[type="checkbox"]:checked') === null ) { continue; }
-        rulesetCount += 1;
-        const stats = rulesetStats(liEntry.dataset.listkey);
-        if ( stats === undefined ) { continue; }
-        ruleCount += stats.ruleCount;
-        filterCount += stats.filterCount;
+    {
+        const input = qs$('#strictBlockMode input[type="checkbox"]');
+        const canStrictBlock = cachedRulesetData.hasOmnipotence;
+        input.checked = canStrictBlock && cachedRulesetData.strictBlockMode;
+        dom.attr(input, 'disabled', canStrictBlock ? null : '');
     }
-    dom.text('#listsOfBlockedHostsPrompt', i18n$('perRulesetStats')
-        .replace('{{ruleCount}}', ruleCount.toLocaleString())
-        .replace('{{filterCount}}', filterCount.toLocaleString())
-    );
 
-    dom.cl.toggle(dom.body, 'noMoreRuleset',
-        rulesetCount === cachedRulesetData.maxNumberOfEnabledRulesets
-    );
+    {
+        const state = Boolean(cachedRulesetData.developerMode) &&
+            cachedRulesetData.disabledFeatures?.includes('develop') !== true;
+        dom.body.dataset.develop = `${state}`;
+        dom.prop('#developerMode input[type="checkbox"]', 'checked', state);
+    }
 }
 
 /******************************************************************************/
@@ -261,17 +107,18 @@ async function onFilteringModeChange(ev) {
     const newLevel = parseInt(input.value, 10);
 
     switch ( newLevel ) {
-    case 1: { // Revoke broad permissions
-        await browser.permissions.remove({
-            origins: [ '<all_urls>' ]
+    case 1: {
+        const actualLevel = await sendMessage({
+            what: 'setDefaultFilteringMode',
+            level: newLevel,
         });
-        cachedRulesetData.defaultFilteringMode = 1;
+        cachedRulesetData.defaultFilteringMode = actualLevel;
         break;
     }
     case 2:
-    case 3: { // Request broad permissions
+    case 3: {
         const granted = await browser.permissions.request({
-            origins: [ '<all_urls>' ]
+            origins: [ '<all_urls>' ],
         });
         if ( granted ) {
             const actualLevel = await sendMessage({
@@ -279,13 +126,14 @@ async function onFilteringModeChange(ev) {
                 level: newLevel,
             });
             cachedRulesetData.defaultFilteringMode = actualLevel;
+            cachedRulesetData.hasOmnipotence = true;
         }
         break;
     }
     default:
         break;
     }
-    renderFilterLists();
+    renderFilterLists(cachedRulesetData);
     renderWidgets();
 }
 
@@ -312,20 +160,36 @@ dom.on('#showBlockedCount input[type="checkbox"]', 'change', ev => {
     });
 });
 
+dom.on('#strictBlockMode input[type="checkbox"]', 'change', ev => {
+    sendMessage({
+        what: 'setStrictBlockMode',
+        state: ev.target.checked,
+    });
+});
+
+dom.on('#developerMode input[type="checkbox"]', 'change', ev => {
+    const state = ev.target.checked;
+    sendMessage({ what: 'setDeveloperMode', state });
+    dom.body.dataset.develop = `${state}`;
+});
+
 /******************************************************************************/
 
 function renderTrustedSites() {
-    const textarea = qs$('#trustedSites');
-    const hostnames = cachedRulesetData.trustedSites;
-    textarea.value = hostnames.map(hn => punycode.toUnicode(hn)).join('\n');
-    if ( textarea.value !== '' ) {
-        textarea.value += '\n';
-    }
+    const hostnames = cachedRulesetData.trustedSites || [];
+    let text = hostnames.map(hn => punycode.toUnicode(hn)).join('\n');
+    if ( text !== '' ) { text += '\n'; }
+    cmTrustedSites.dispatch({
+        changes: {
+            from: 0, to: cmTrustedSites.state.doc.length,
+            insert: text
+        },
+    });
 }
 
 function changeTrustedSites() {
     const hostnames = getStagedTrustedSites();
-    const hash = hashFromIterable(cachedRulesetData.trustedSites);
+    const hash = hashFromIterable(cachedRulesetData.trustedSites || []);
     if ( hashFromIterable(hostnames) === hash ) { return; }
     sendMessage({
         what: 'setTrustedSites',
@@ -334,108 +198,31 @@ function changeTrustedSites() {
 }
 
 function getStagedTrustedSites() {
-    const textarea = qs$('#trustedSites');
-    return textarea.value.split(/\s/).map(hn => {
+    const text = cmTrustedSites.state.doc.toString();
+    return text.split(/\s/).map(hn => {
+        if ( hn === '' ) { return ''; }
         try {
             return punycode.toASCII(
                 (new URL(`https://${hn}/`)).hostname
             );
-        } catch(_) {
+        } catch {
         }
         return '';
     }).filter(hn => hn !== '');
 }
 
-dom.on('#trustedSites', 'blur', changeTrustedSites);
+dom.on(cmTrustedSites.contentDOM, 'blur', changeTrustedSites);
 
 self.addEventListener('beforeunload', changeTrustedSites);
 
 /******************************************************************************/
 
-async function applyEnabledRulesets() {
-    const enabledRulesets = [];
-    for ( const liEntry of qsa$('#lists .listEntry[data-listkey]') ) {
-        const checked = qs$(liEntry, 'input[type="checkbox"]:checked') !== null;
-        dom.cl.toggle(liEntry, 'checked', checked);
-        if ( checked === false ) { continue; }
-        enabledRulesets.push(liEntry.dataset.listkey);
-    }
-
-    await sendMessage({
-        what: 'applyRulesets',
-        enabledRulesets,
-    });
-
-    renderWidgets();
+function listen() {
+    const bc = new self.BroadcastChannel('uBOL');
+    bc.onmessage = listen.onmessage;
 }
 
-dom.on('#lists', 'change', '.listEntry input[type="checkbox"]', ( ) => {
-    applyEnabledRulesets();
-});
-
-/******************************************************************************/
-
-// Collapsing of unused lists.
-
-function mustHideUnusedLists(which) {
-    const hideAll = hideUnusedSet.has('*');
-    if ( which === '*' ) { return hideAll; }
-    return hideUnusedSet.has(which) !== hideAll;
-}
-
-function toggleHideUnusedLists(which) {
-    const doesHideAll = hideUnusedSet.has('*');
-    let groupSelector;
-    let mustHide;
-    if ( which === '*' ) {
-        mustHide = doesHideAll === false;
-        groupSelector = '';
-        hideUnusedSet.clear();
-        if ( mustHide ) {
-            hideUnusedSet.add(which);
-        }
-        dom.cl.toggle(dom.body, 'hideUnused', mustHide);
-        dom.cl.toggle('.groupEntry[data-groupkey]', 'hideUnused', mustHide);
-    } else {
-        const doesHide = hideUnusedSet.has(which);
-        if ( doesHide ) {
-            hideUnusedSet.delete(which);
-        } else {
-            hideUnusedSet.add(which);
-        }
-        mustHide = doesHide === doesHideAll;
-        groupSelector = `.groupEntry[data-groupkey="${which}"]`;
-        dom.cl.toggle(groupSelector, 'hideUnused', mustHide);
-    }
-
-    for ( const elem of qsa$(`#lists ${groupSelector} .listEntry[data-listkey] input[type="checkbox"]:not(:checked)`) ) {
-        dom.cl.toggle(
-            elem.closest('.listEntry[data-listkey]'),
-            'unused',
-            mustHide
-        );
-    }
-
-    localWrite('hideUnusedFilterLists', Array.from(hideUnusedSet));
-}
-
-dom.on('#lists', 'click', '.groupEntry[data-groupkey] > .geDetails', ev => {
-    toggleHideUnusedLists(
-        dom.attr(ev.target.closest('[data-groupkey]'), 'data-groupkey')
-    );
-});
-
-// Initialize from saved state.
-localRead('hideUnusedFilterLists').then(value => {
-    if ( Array.isArray(value) === false ) { return; }
-    hideUnusedSet = new Set(value);
-});
-
-/******************************************************************************/
-
-const bc = new self.BroadcastChannel('uBOL');
-
-bc.onmessage = ev => {
+listen.onmessage = ev => {
     const message = ev.data;
     if ( message instanceof Object === false ) { return; }
     const local = cachedRulesetData;
@@ -452,6 +239,13 @@ bc.onmessage = ev => {
             }
             const combined = Array.from(new Set([ ...message.trustedSites, ...staged ]));
             local.trustedSites = combined;
+            render = true;
+        }
+    }
+
+    if ( message.hasOmnipotence !== undefined ) {
+        if ( message.hasOmnipotence !== local.hasOmnipotence ) {
+            local.hasOmnipotence = message.hasOmnipotence;
             render = true;
         }
     }
@@ -477,6 +271,20 @@ bc.onmessage = ev => {
         }
     }
 
+    if ( message.strictBlockMode !== undefined ) {
+        if ( message.strictBlockMode !== local.strictBlockMode ) {
+            local.strictBlockMode = message.strictBlockMode;
+            render = true;
+        }
+    }
+
+    if ( message.adminRulesets !== undefined ) {
+        if ( hashFromIterable(message.adminRulesets) !== hashFromIterable(local.adminRulesets) ) {
+            local.adminRulesets = message.adminRulesets;
+            render = true;
+        }
+    }
+
     if ( message.enabledRulesets !== undefined ) {
         if ( hashFromIterable(message.enabledRulesets) !== hashFromIterable(local.enabledRulesets) ) {
             local.enabledRulesets = message.enabledRulesets;
@@ -485,7 +293,7 @@ bc.onmessage = ev => {
     }
 
     if ( render === false ) { return; }
-    renderFilterLists();
+    renderFilterLists(cachedRulesetData);
     renderWidgets();
 };
 
@@ -496,13 +304,15 @@ sendMessage({
 }).then(data => {
     if ( !data ) { return; }
     cachedRulesetData = data;
-    rulesetMap.clear();
-    cachedRulesetData.rulesetDetails.forEach(rule => rulesetMap.set(rule.id, rule));
     try {
-        renderFilterLists();
+        renderAdminRules();
+        renderFilterLists(cachedRulesetData);
         renderWidgets();
-    } catch(ex) {
+        dom.cl.remove(dom.body, 'loading');
+    } catch(reason) {
+        console.error(reason);
     }
+    listen();
 }).catch(reason => {
     console.trace(reason);
 });

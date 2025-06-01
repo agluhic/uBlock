@@ -19,12 +19,8 @@
     Home: https://github.com/gorhill/uBlock
 */
 
-'use strict';
-
-/******************************************************************************/
-
+import { builtinScriptlets } from './js/resources/scriptlets.js';
 import fs from 'fs/promises';
-import { builtinScriptlets } from './scriptlets.js';
 import { safeReplace } from './safe-replace.js';
 
 /******************************************************************************/
@@ -79,7 +75,7 @@ export function reset() {
 
 /******************************************************************************/
 
-export function compile(details) {
+export function compile(assetDetails, details) {
     if ( details.args[0].endsWith('.js') === false ) {
         details.args[0] += '.js';
     }
@@ -89,8 +85,9 @@ export function compile(details) {
     const scriptletToken = details.args[0];
     const resourceEntry = resourceDetails.get(scriptletToken);
     if ( resourceEntry === undefined ) { return; }
+    const argsToken = JSON.stringify(details.args.slice(1));
     if ( resourceEntry.requiresTrust && details.trustedSource !== true ) {
-        console.log(`Rejecting ${scriptletToken}: source is not trusted`);
+        console.log(`Rejecting +js(${scriptletToken},${argsToken.slice(1,-1)}): ${assetDetails.id} is not trusted`);
         return;
     }
     if ( scriptletFiles.has(scriptletToken) === false ) {
@@ -100,36 +97,34 @@ export function compile(details) {
             world: resourceEntry.world,
             args: new Map(),
             hostnames: new Map(),
-            entities: new Map(),
             exceptions: new Map(),
+            hasEntities: false,
+            hasAncestors: false,
             matches: new Set(),
         });
     }
     const scriptletDetails = scriptletFiles.get(scriptletToken);
-    const argsToken = JSON.stringify(details.args.slice(1));
     if ( scriptletDetails.args.has(argsToken) === false ) {
         scriptletDetails.args.set(argsToken, scriptletDetails.args.size);
     }
     const iArgs = scriptletDetails.args.get(argsToken);
     if ( details.matches ) {
         for ( const hn of details.matches ) {
-            if ( hn.endsWith('.*') ) {
+            const isEntity = hn.endsWith('.*') || hn.endsWith('.*>>');
+            scriptletDetails.hasEntities ||= isEntity;
+            const isAncestor = hn.endsWith('>>')
+            scriptletDetails.hasAncestors ||= isAncestor;
+            if ( isEntity || isAncestor ) {
                 scriptletDetails.matches.clear();
                 scriptletDetails.matches.add('*');
-                const entity = hn.slice(0, -2);
-                if ( scriptletDetails.entities.has(entity) === false ) {
-                    scriptletDetails.entities.set(entity, new Set());
-                }
-                scriptletDetails.entities.get(entity).add(iArgs);
-            } else {
-                if ( scriptletDetails.matches.has('*') === false ) {
-                    scriptletDetails.matches.add(hn);
-                }
-                if ( scriptletDetails.hostnames.has(hn) === false ) {
-                    scriptletDetails.hostnames.set(hn, new Set());
-                }
-                scriptletDetails.hostnames.get(hn).add(iArgs);
             }
+            if ( scriptletDetails.matches.has('*') === false ) {
+                scriptletDetails.matches.add(hn);
+            }
+            if ( scriptletDetails.hostnames.has(hn) === false ) {
+                scriptletDetails.hostnames.set(hn, new Set());
+            }
+            scriptletDetails.hostnames.get(hn).add(iArgs);
         }
     } else {
         scriptletDetails.matches.add('*');
@@ -167,7 +162,6 @@ export async function commit(rulesetId, path, writeFn) {
         );
         content = safeReplace(content, /\$rulesetId\$/, rulesetId, 0);
         content = safeReplace(content, /\$scriptletName\$/, details.name, 0);
-        content = safeReplace(content, '$world$', details.world);
         content = safeReplace(content,
             'self.$argsList$',
             JSON.stringify(Array.from(details.args.keys()).map(a => JSON.parse(a)))
@@ -177,15 +171,24 @@ export async function commit(rulesetId, path, writeFn) {
             JSON.stringify(patchHnMap(details.hostnames))
         );
         content = safeReplace(content,
-            'self.$entitiesMap$',
-            JSON.stringify(patchHnMap(details.entities))
+            'self.$hasEntities$',
+            JSON.stringify(details.hasEntities)
+        );
+        content = safeReplace(content,
+            'self.$hasAncestors$',
+            JSON.stringify(details.hasAncestors)
         );
         content = safeReplace(content,
             'self.$exceptionsMap$',
             JSON.stringify(Array.from(details.exceptions))
         );
         writeFn(`${path}/${rulesetId}.${name}`, content);
-        scriptletStats.push([ name.slice(0, -3), Array.from(details.matches).sort() ]);
+        scriptletStats.push([
+            name.slice(0, -3), {
+                hostnames: Array.from(details.matches).sort(),
+                world: details.world,
+            }
+        ]);
     }
     return scriptletStats;
 }

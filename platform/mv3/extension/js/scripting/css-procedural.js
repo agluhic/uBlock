@@ -19,12 +19,6 @@
     Home: https://github.com/gorhill/uBlock
 */
 
-/* jshint esversion:11 */
-
-'use strict';
-
-/******************************************************************************/
-
 // Important!
 // Isolate from global scope
 (function uBOL_cssProcedural() {
@@ -33,97 +27,68 @@
 
 const proceduralImports = self.proceduralImports || [];
 self.proceduralImports = undefined;
-delete self.proceduralImports;
 
 /******************************************************************************/
-
-const hnParts = [];
-try { hnParts.push(...document.location.hostname.split('.')); }
-catch(ex) { }
-const hnpartslen = hnParts.length;
-if ( hnpartslen === 0 ) { return; }
 
 const selectors = [];
+const exceptions = [];
 
-for ( const { argsList, exceptionsMap, hostnamesMap, entitiesMap } of proceduralImports ) {
-    const todoIndices = new Set();
-    const tonotdoIndices = [];
-    // Exceptions
-    if ( exceptionsMap.size !== 0 ) {
-        for ( let i = 0; i < hnpartslen; i++ ) {
-            const hn = hnParts.slice(i).join('.');
-            const excepted = exceptionsMap.get(hn);
-            if ( excepted ) { tonotdoIndices.push(...excepted); }
-        }
-        exceptionsMap.clear();
+const lookupHostname = (hostname, details, out) => {
+    let seqi = details.hostnamesMap.get(hostname);
+    if ( seqi === undefined ) { return; }
+    const { argsList, argsSeqs } = details;
+    for (;;) {
+        const argi = argsSeqs[seqi++];
+        const done = argi > 0;
+        out.push(...argsList[done ? argi : -argi]);
+        if ( done ) { break; }
     }
-    // Hostname-based
-    if ( hostnamesMap.size !== 0 ) {
-        const collectArgIndices = hn => {
-            let argsIndices = hostnamesMap.get(hn);
-            if ( argsIndices === undefined ) { return; }
-            if ( typeof argsIndices === 'number' ) { argsIndices = [ argsIndices ]; }
-            for ( const argsIndex of argsIndices ) {
-                if ( tonotdoIndices.includes(argsIndex) ) { continue; }
-                todoIndices.add(argsIndex);
-            }
-        };
-        for ( let i = 0; i < hnpartslen; i++ ) {
-            const hn = hnParts.slice(i).join('.');
-            collectArgIndices(hn);
-        }
-        collectArgIndices('*');
-        hostnamesMap.clear();
+};
+
+const lookupAll = hostname => {
+    for ( const details of proceduralImports ) {
+        lookupHostname(hostname, details, selectors);
+        lookupHostname(`~${hostname}`, details, exceptions);
     }
-    // Entity-based
-    if ( entitiesMap.size !== 0 ) {
-        const n = hnpartslen - 1;
-        for ( let i = 0; i < n; i++ ) {
-            for ( let j = n; j > i; j-- ) {
-                const en = hnParts.slice(i,j).join('.');
-                let argsIndices = entitiesMap.get(en);
-                if ( argsIndices === undefined ) { continue; }
-                if ( typeof argsIndices === 'number' ) { argsIndices = [ argsIndices ]; }
-                for ( const argsIndex of argsIndices ) {
-                    if ( tonotdoIndices.includes(argsIndex) ) { continue; }
-                    todoIndices.add(argsIndex);
-                }
-            }
-        }
-        entitiesMap.clear();
-    }
-    for ( const i of todoIndices ) {
-        selectors.push(...argsList[i].map(json => JSON.parse(json)));
-    }
-    argsList.length = 0;
-}
+};
+
+self.isolatedAPI.forEachHostname(lookupAll, {
+    hasEntities: proceduralImports.some(a => a.hasEntities)
+});
+
 proceduralImports.length = 0;
 
-if ( selectors.length === 0 ) { return; }
+const exceptedSelectors = exceptions.length !== 0
+    ? selectors.filter(a => exceptions.includes(a) === false)
+    : selectors;
+if ( exceptedSelectors.length === 0 ) { return; }
 
 /******************************************************************************/
 
-const uBOL_injectCSS = (css, count = 10) => {
-    chrome.runtime.sendMessage({ what: 'insertCSS', css }).catch(( ) => {
-        count -= 1;
-        if ( count === 0 ) { return; }
-        uBOL_injectCSS(css, count - 1);
+const uBOL_injectCSS = css => {
+    chrome.runtime.sendMessage({
+        what: 'insertCSS',
+        css,
+    }).catch(( ) => {
     });
 };
 
 const nonVisualElements = {
+    head: true,
+    link: true,
+    meta: true,
     script: true,
     style: true,
 };
 
 const regexFromString = (s, exact = false) => {
     if ( s === '' ) { return /^/; }
-    const match = /^\/(.+)\/([i]?)$/.exec(s);
+    const match = /^\/(.+)\/([imu]*)$/.exec(s);
     if ( match !== null ) {
         return new RegExp(match[1], match[2] || undefined);
     }
     const reStr = s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(exact ? `^${reStr}$` : reStr, 'i');
+    return new RegExp(exact ? `^${reStr}$` : reStr);
 };
 
 /******************************************************************************/
@@ -242,7 +207,7 @@ class PSelectorMatchesMediaTask extends PSelectorTask {
         if ( this.mql.media === 'not all' ) { return; }
         this.mql.addEventListener('change', ( ) => {
             if ( proceduralFilterer instanceof Object === false ) { return; }
-            proceduralFilterer.onDOMChanged([ null ]);
+            proceduralFilterer.onDOMChanged();
         });
     }
     transpose(node, output) {
@@ -264,6 +229,32 @@ class PSelectorMatchesPathTask extends PSelectorTask {
         if ( this.needle.test(self.location.pathname + self.location.search) ) {
             output.push(node);
         }
+    }
+}
+
+/******************************************************************************/
+
+class PSelectorMatchesPropTask extends PSelectorTask {
+    constructor(task) {
+        super();
+        this.props = task[1].attr.split('.');
+        this.reValue = task[1].value !== ''
+            ? regexFromString(task[1].value, true)
+            : null;
+    }
+    transpose(node, output) {
+        let value = node;
+        for ( const prop of this.props ) {
+            if ( value === undefined ) { return; }
+            if ( value === null ) { return; }
+            value = value[prop];
+        }
+        if ( this.reValue === null ) {
+            if ( value === undefined ) { return; }
+        } else if ( this.reValue.test(value) === false ) {
+            return;
+        }
+        output.push(node);
     }
 }
 
@@ -295,28 +286,27 @@ class PSelectorOthersTask extends PSelectorTask {
         const toKeep = new Set(this.targets);
         const toDiscard = new Set();
         const body = document.body;
+        const head = document.head;
         let discard = null;
         for ( let keep of this.targets ) {
-            while ( keep !== null && keep !== body ) {
+            while ( keep !== null && keep !== body && keep !== head ) {
                 toKeep.add(keep);
                 toDiscard.delete(keep);
                 discard = keep.previousElementSibling;
                 while ( discard !== null ) {
-                    if (
-                        nonVisualElements[discard.localName] !== true &&
-                        toKeep.has(discard) === false
-                    ) {
-                        toDiscard.add(discard);
+                    if ( nonVisualElements[discard.localName] !== true ) {
+                        if ( toKeep.has(discard) === false ) {
+                            toDiscard.add(discard);
+                        }
                     }
                     discard = discard.previousElementSibling;
                 }
                 discard = keep.nextElementSibling;
                 while ( discard !== null ) {
-                    if (
-                        nonVisualElements[discard.localName] !== true &&
-                        toKeep.has(discard) === false
-                    ) {
-                        toDiscard.add(discard);
+                    if ( nonVisualElements[discard.localName] !== true ) {
+                        if ( toKeep.has(discard) === false ) {
+                            toDiscard.add(discard);
+                        }
                     }
                     discard = discard.nextElementSibling;
                 }
@@ -461,7 +451,7 @@ class PSelectorWatchAttrs extends PSelectorTask {
     // TODO: Is it worth trying to re-apply only the current selector?
     handler() {
         if ( proceduralFilterer instanceof Object ) {
-            proceduralFilterer.onDOMChanged([ null ]);
+            proceduralFilterer.onDOMChanged();
         }
     }
     transpose(node, output) {
@@ -570,6 +560,7 @@ PSelector.prototype.operatorToTaskMap = new Map([
     [ 'matches-css-before', PSelectorMatchesCSSBeforeTask ],
     [ 'matches-media', PSelectorMatchesMediaTask ],
     [ 'matches-path', PSelectorMatchesPathTask ],
+    [ 'matches-prop', PSelectorMatchesPropTask ],
     [ 'min-text-length', PSelectorMinTextLengthTask ],
     [ 'not', PSelectorIfNotTask ],
     [ 'others', PSelectorOthersTask ],
@@ -594,14 +585,14 @@ class PSelectorRoot extends PSelector {
     prime(input) {
         try {
             return super.prime(input);
-        } catch (ex) {
+        } catch {
         }
         return [];
     }
     exec(input) {
         try {
             return super.exec(input);
-        } catch (ex) {
+        } catch {
         }
         return [];
     }
@@ -623,7 +614,7 @@ class ProceduralFilterer {
         this.uBOL_commitNow();
     }
 
-    addSelectors() {
+    addSelectors(selectors) {
         for ( const selector of selectors ) {
             const pselector = new PSelectorRoot(selector);
             this.primeProceduralSelector(pselector);
@@ -764,7 +755,9 @@ class ProceduralFilterer {
 
 /******************************************************************************/
 
-const proceduralFilterer = new ProceduralFilterer(selectors);
+const proceduralFilterer = new ProceduralFilterer(
+    exceptedSelectors.map(a => JSON.parse(a))
+);
 
 const observer = new MutationObserver(mutations => {
     let domChanged = false;

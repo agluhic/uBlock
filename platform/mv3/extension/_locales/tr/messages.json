@@ -4,7 +4,7 @@
     "description": "extension name."
   },
   "extShortDesc": {
-    "message": "İzin gerektirmeyen içerik engelleyicisi. Kurulumdan hemen sonra reklamları, izleyicileri, kripto madencilerini, ve daha fazlasını engeller.",
+    "message": "Etkili bir içerik engelleyici. Reklamları, izleyicileri, madencileri ve daha fazlasını kurulumdan hemen sonra engeller.",
     "description": "this will be in the Chrome web store: must be 132 characters or less"
   },
   "perRulesetStats": {
@@ -19,6 +19,10 @@
     "message": "Ayarlar",
     "description": "appears as tab name in dashboard"
   },
+  "developPageName": {
+    "message": "Geliştir",
+    "description": "appears as tab name in dashboard. Inspired from 'Develop' menu in Safari, see https://developer.apple.com/documentation/safari-developer-tools/develop-menu"
+  },
   "aboutPageName": {
     "message": "Hakkında",
     "description": "appears as tab name in dashboard"
@@ -30,6 +34,10 @@
   "popupFilteringModeLabel": {
     "message": "Filtreleme modu",
     "description": "Label in the popup panel for the current filtering mode"
+  },
+  "popupTipReport": {
+    "message": "Bu sitedeki bir sorunu bildir",
+    "description": "Tooltip used for the 'chat' icon in the panel"
   },
   "popupTipDashboard": {
     "message": "Kontrol panelini aç",
@@ -99,13 +107,73 @@
     "message": "Dış bağlılıklar (GPLv3-uyumlu):",
     "description": "Shown in the About pane"
   },
-  "firstRunSectionLabel": {
-    "message": "Hoş geldiniz",
-    "description": "The header text for the welcome message section"
+  "supportS6H": {
+    "message": "Bir filtre sorununu bildir",
+    "description": "Header of 'Report a filter issue' section in Support pane"
   },
-  "firstRunDescription": {
-    "message": "Az önce uBO Lite'ı indirdiniz. Buradan tüm siteler için varsayılan filtreleme modlarını seçebilirsiniz.\n\nVarsayılan olarak, <em>Basit</em> mod seçilidir çünkü verileri okuma ve yazma izni gerektirmez. uBO Lite'a güveniyorsanız, tüm sitelerde verileri okuma ve yazma izni verebilirsiniz ve daha gelişmiş filtreleme yeteneklerine tüm sitelerde sahip olabilirsiniz.",
-    "description": "Descriptive text shown at first install time only "
+  "supportS3P1": {
+    "message": "Bir sitedeki filtre sorunlarını bildirmek için <span data-url=\"https://github.com/uBlockOrigin/uAssets/issues?q=is%3Aissue\"><code>uBlockOrigin/uAssets</code> sorun takibi</span> sayfasını kullanın. <u>Bir GitHub hesabı gerekir.</u>",
+    "description": "First paragraph of 'Filter issues' section in Support pane"
+  },
+  "supportS5H": {
+    "message": "Sorun giderme bilgisi",
+    "description": "Label of 'Troubleshooting information' section in 'Report a filter issue' page"
+  },
+  "supportS6P1S1": {
+    "message": "Gönüllüleri benzer raporlar ile bezdirmemek için sorunun zaten bildirilip bildirilmediğine bakın. <b>Not:</b> Butona tıklamak sayfanın temel adresini GitHub'a gönderir.",
+    "description": "A paragraph in the filter issue reporter section"
+  },
+  "supportFindSpecificButton": {
+    "message": "GitHub'da benzer raporları bul",
+    "description": "A clickable link in the filter issue reporter section"
+  },
+  "supportS6URL": {
+    "message": "Web sayfasının adresi:",
+    "description": "Label for the URL of the page"
+  },
+  "supportS6Select1": {
+    "message": "Web sayfası…",
+    "description": "Label for widget to select type of issue"
+  },
+  "supportS6Select1Option0": {
+    "message": "-- Bir girdi seçin --",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option1": {
+    "message": "Reklamlar veya reklam artıkları gösteriyor",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option2": {
+    "message": "Arayüzde kaplamalar veya diğer can sıkıcı ögeler var",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option3": {
+    "message": "uBO Lite tespit ediliyor",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option4": {
+    "message": "Gizlilikle ilgili sorunları var",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option5": {
+    "message": "uBO Lite kullanımdayken sayfa bozuluyor ",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option6": {
+    "message": "İstenmeyen sekme veya pencereler açıyor",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option7": {
+    "message": "Kötü niyetli yazılıma, oltalamaya yönlendiriyor",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Checkbox1": {
+    "message": "Sayfayı “NSFW” (<a href=\"https://wikipedia.org/wiki/Not_safe_for_work\">“iş için güvenli değil”</a>) olarak işaretle",
+    "description": "A checkbox to use for NSFW sites"
+  },
+  "supportReportSpecificButton": {
+    "message": "GitHub'da yeni rapor oluştur",
+    "description": "Text for button which open an external webpage in Support pane"
   },
   "defaultFilteringModeSectionLabel": {
     "message": "Varsayılan filtreleme modu",
@@ -147,16 +215,108 @@
     "message": "Filtreleme yapılmayacak alan alarının listesi",
     "description": "A short description for the editable field which lists trusted sites"
   },
+  "noFilteringModePlaceholder": {
+    "message": "[sadece alan adları]\norneksite.com\noyunlar.site\n…",
+    "description": "Default text for in edit field"
+  },
   "behaviorSectionLabel": {
     "message": "Davranış",
     "description": "The header text for the 'Behavior' section"
   },
   "autoReloadLabel": {
-    "message": "Filtreleme modu değiştirildiğinde sayfayı yenile",
+    "message": "Filtreleme modunu değiştirirken sayfayı otomatik olarak yenile",
     "description": "Label for a checkbox in the options page"
   },
   "showBlockedCountLabel": {
     "message": "Engellenen isteklerin sayısını araç çubuğu simgesinde göster",
     "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLabel": {
+    "message": "Sıkı engellemeyi etkinleştir",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLegend": {
+    "message": "İstenmeyebilecek sitelere erişim engellenecek ve devam etme seçeneği sunulacaktır.",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "developerModeLabel": {
+    "message": "Geliştirici modu",
+    "description": "Label for a checkbox in the options page"
+  },
+  "developerModeLegend": {
+    "message": "Teknik kullanıcılara uygun özelliklere erişime izin ver",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "findListsPlaceholder": {
+    "message": "Liste bul",
+    "description": "Placeholder for the input field used to find lists"
+  },
+  "strictblockTitle": {
+    "message": "Sayfa engellendi",
+    "description": "Webpage title for the strict-blocked page"
+  },
+  "strictblockSentence1": {
+    "message": "uBo Lite aşağıdaki sayfaların yüklenmesini engelledi:",
+    "description": "Sentence used in the strict-blocked page"
+  },
+  "strictblockReasonSentence1": {
+    "message": "Bu sayfa {{listname}} içindeki bir filtreye takıldığı için engellenmiştir.",
+    "description": "Text informing about what is causing the page to be blocked"
+  },
+  "strictblockRedirectSentence1": {
+    "message": "Engellenen sayfa sizi başka bir siteye yönlendirmek istiyor. Devam etmek isterseniz doğrudan şuraya yönlendirileceksiniz: {{url}}",
+    "description": "Text warning about an incoming redirect"
+  },
+  "strictblockNoParamsPrompt": {
+    "message": "değişkensiz",
+    "description": "Label to be used for the parameter-less URL"
+  },
+  "strictblockBack": {
+    "message": "Geri git",
+    "description": "A button to go back to the previous webpage"
+  },
+  "strictblockClose": {
+    "message": "Bu pencereyi kapat",
+    "description": "A button to close the current tab"
+  },
+  "strictblockDontWarn": {
+    "message": "Bu site için beni bir daha uyarma",
+    "description": "Label for checkbox in document-blocked page"
+  },
+  "strictblockProceed": {
+    "message": "Devam et",
+    "description": "A button to navigate to the blocked page"
+  },
+  "zapperTipEnter": {
+    "message": "Öge silme moduna gir",
+    "description": "Tooltip for the button used to enter zapper mode"
+  },
+  "zapperTipQuit": {
+    "message": "Öge silme modundan çık",
+    "description": "Tooltip for the button used to exit zapper mode"
+  },
+  "saveButton": {
+    "message": "Kaydet",
+    "description": "Text for buttons used to save changes"
+  },
+  "revertButton": {
+    "message": "Geri al",
+    "description": "Text for buttons used to revert changes"
+  },
+  "importAndAppendButton": {
+    "message": "İçe aktar ve ekle…",
+    "description": "Text for buttons used to import and append content"
+  },
+  "exportButton": {
+    "message": "Dışa aktar…",
+    "description": "Text for buttons used to export content"
+  },
+  "dnrRulesSummary": {
+    "message": "Aşağıya kendi DNR kurallarınızı girin. <b>Güvenilmeyen kaynaklardan içerik eklemeyin.</b>",
+    "description": "Short description of the DNR rules editor pane"
+  },
+  "dnrRulesCountInfo": {
+    "message": "Kayıtlı kural sayısı: {count}",
+    "description": "Short sentence to report the number of currently registered DNR rules"
   }
 }

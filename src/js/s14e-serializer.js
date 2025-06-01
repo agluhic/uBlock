@@ -249,8 +249,29 @@ const toArrayBufferViewConstructor = {
 
 /******************************************************************************/
 
-const textDecoder = new TextDecoder();
-const textEncoder = new TextEncoder();
+const textCodec = {
+    decoder: null,
+    encoder: null,
+    decode(...args) {
+        if ( this.decoder === null ) {
+            this.decoder = new globalThis.TextDecoder();
+        }
+        return this.decoder.decode(...args);
+    },
+    encode(...args) {
+        if ( this.encoder === null ) {
+            this.encoder = new globalThis.TextEncoder();
+        }
+        return this.encoder.encode(...args);
+    },
+    encodeInto(...args) {
+        if ( this.encoder === null ) {
+            this.encoder = new globalThis.TextEncoder();
+        }
+        return this.encoder.encodeInto(...args);
+    },
+};
+
 const isInteger = Number.isInteger;
 
 const writeRefs = new Map();
@@ -269,7 +290,7 @@ const uint8InputFromAsciiStr = s => {
     if ( uint8Input === null || uint8Input.length < s.length ) {
         uint8Input = new Uint8Array(s.length + 0x03FF & ~0x03FF);
     }
-    textEncoder.encodeInto(s, uint8Input);
+    textCodec.encodeInto(s, uint8Input);
     return uint8Input;
 };
 
@@ -284,9 +305,6 @@ const shouldCompress = (s, options) =>
         options.compressThreshold === undefined ||
         options.compressThreshold <= s.length
     );
-
-const hasOwnProperty = (o, p) =>
-    Object.prototype.hasOwnProperty.call(o, p);
 
 /*******************************************************************************
  * 
@@ -407,7 +425,7 @@ const denseArrayBufferToStr = (arrbuf, details) => {
             }
         }
     }
-    return textDecoder.decode(output);
+    return textCodec.decode(output);
 };
 
 const BASE88_POW1 = NUMSAFECHARS;
@@ -489,7 +507,7 @@ const sparseArrayBufferToStr = (arrbuf, details) => {
             uint8out[j++] = SEPARATORCHARCODE;
         }
     }
-    return textDecoder.decode(uint8out);
+    return textCodec.decode(uint8out);
 };
 
 const sparseArrayBufferFromStr = (sparseStr, arrbuf) => {
@@ -592,7 +610,8 @@ const _serialize = data => {
         return;
     }
     if ( xtypeInt === I_DATE ) {
-        writeBuffer.push(C_DATE + _serialize(data.getTime()));
+        writeBuffer.push(C_DATE);
+        _serialize(data.getTime());
         return;
     }
     // Reference to composite types
@@ -829,10 +848,11 @@ const _deserialize = ( ) => {
     case I_DATAVIEW: {
         const byteOffset = deserializeLargeUint();
         const length = deserializeLargeUint();
+        const ref = refCounter++;
         const arrayBuffer = _deserialize();
         const ctor = toArrayBufferViewConstructor[`${type}`];
         const out = new ctor(arrayBuffer, byteOffset, length);
-        readRefs.set(refCounter++, out);
+        readRefs.set(ref, out);
         return out;
     }
     default:
@@ -1059,7 +1079,7 @@ export const serialize = (data, options = {}) => {
     writeBuffer.length = 0;
     if ( shouldCompress(s, options) === false ) { return s; }
     const lz4Util = new LZ4BlockJS();
-    const uint8ArrayBefore = textEncoder.encode(s);
+    const uint8ArrayBefore = textCodec.encode(s);
     const uint8ArrayAfter = lz4Util.encode(uint8ArrayBefore, 0);
     const lz4 = {
         size: uint8ArrayBefore.length,
@@ -1075,29 +1095,33 @@ export const serialize = (data, options = {}) => {
     return ratio <= 0.85 ? t : s;
 };
 
-export const deserialize = s => {
-    if ( s.startsWith(MAGICLZ4PREFIX) ) {
-        refCounter = 1;
-        readStr = s;
-        readEnd = s.length;
-        readPtr = MAGICLZ4PREFIX.length;
-        const lz4 = _deserialize();
-        readRefs.clear();
-        readStr = '';
-        const lz4Util = new LZ4BlockJS();
-        const uint8ArrayAfter = lz4Util.decode(lz4.data, 0, lz4.size);
-        s = textDecoder.decode(new Uint8Array(uint8ArrayAfter));
-    }
-    if ( s.startsWith(MAGICPREFIX) === false ) { return; }
+const deserializeById = (blockid, s) => {
     refCounter = 1;
     readStr = s;
     readEnd = s.length;
-    readPtr = MAGICPREFIX.length;
+    readPtr = blockid.length;
     const data = _deserialize();
     readRefs.clear();
     readStr = '';
-    uint8Input = null;
     if ( readPtr === FAILMARK ) { return; }
+    return data;
+};
+
+export const deserialize = s => {
+    if ( s.startsWith(MAGICLZ4PREFIX) ) {
+        const lz4 = deserializeById(MAGICLZ4PREFIX, s);
+        if ( lz4 ) {
+            const lz4Util = new LZ4BlockJS();
+            const uint8ArrayAfter = lz4Util.decode(lz4.data, 0, lz4.size);
+            if ( uint8ArrayAfter ) {
+                s = textCodec.decode(new Uint8Array(uint8ArrayAfter));
+            }
+        }
+    }
+    const data = s.startsWith(MAGICPREFIX)
+        ? deserializeById(MAGICPREFIX, s)
+        : undefined;
+    uint8Input = null;
     return data;
 };
 
@@ -1128,7 +1152,7 @@ export const getConfig = ( ) => Object.assign({}, currentConfig);
 
 export const setConfig = config => {
     for ( const key in Object.keys(config) ) {
-        if ( hasOwnProperty(defaultConfig, key) === false ) { continue; }
+        if ( Object.hasOwn(defaultConfig, key) === false ) { continue; }
         const val = config[key];
         if ( typeof val !== typeof defaultConfig[key] ) { continue; }
         if ( (validateConfig[key])(val) === false ) { continue; }
@@ -1395,8 +1419,14 @@ if ( isInstanceOf(globalThis, 'DedicatedWorkerGlobalScope') ) {
             break;
         }
         case THREAD_DESERIALIZE: {
-            const result = deserialize(msg.data);
-            globalThis.postMessage({ id: msg.id, size: msg.size, result });
+            let result;
+            try {
+                result = deserialize(msg.data);
+            } catch(ex) {
+                console.error(ex);
+            } finally {
+                globalThis.postMessage({ id: msg.id, size: msg.size, result });
+            }
             break;
         }
         default:

@@ -4,6 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark" />
 <link rel="stylesheet" href="css/default.css">
 <link rel="stylesheet" href="css/common.css">
 <link rel="stylesheet" href="css/fa-icons.css">
@@ -13,6 +14,7 @@
 </head>
 
 <body class="loading" data-section="">
+
 <div id="main">
     <div id="hostname"><span></span>&shy;<span></span></div>
     <!-- -------- -->
@@ -25,12 +27,12 @@
     </div>
     <!-- -------- -->
     <div id="filteringModeText"><label data-i18n="popupFilteringModeLabel">_</label><br><span>_</span><span></span></div>
+    <!-- -------- -->
     <div class="toolRibbon pageTools">
-        <span></span>
-        <span></span>
-        <span></span>
-        <span></span>
-        <span class="fa-icon tool enabled" tabindex="0" data-i18n-title="popupTipDashboard">cogs<span class="caption" data-i18n="popupTipDashboard"></span></span>
+        <span id="gotoZapper" class="fa-icon tool enabled" data-i18n-title="zapperTipEnter">bolt<span class="caption" data-i18n="zapperTipEnter"></span></span>
+        <span id="showMatchedRules" class="fa-icon tool" tabindex="0" title="Show matched rules">list-alt<span class="caption">Show matched rules</span></span>
+        <span id="reportFilterIssue" class="fa-icon tool enabled" data-i18n-title="popupTipReport">comment-alt<span class="caption" data-i18n="popupTipReport"></span></span>
+        <span id="gotoDashboard" class="fa-icon tool enabled" tabindex="0" data-i18n-title="popupTipDashboard">cogs<span class="caption" data-i18n="popupTipDashboard"></span></span>
     </div>
     <!-- -------- -->
     <div id="rulesetStats" data-section="a">
